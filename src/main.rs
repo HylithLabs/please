@@ -15,8 +15,11 @@ fn main() {
         Some("commit") => commands::commit::run(),
         Some("push") => commands::push::run(),
         Some("setup") => commands::setup::run(),
+        Some("status") => commands::status::run(),
+        Some("branch") => commands::branch::run(&args[2..]),
+        Some("switch") => commands::switch::run(&args[2..]),
         _ => {
-            eprintln!("usage: please <setup|commit|push>");
+            eprintln!("usage: please <setup|commit|push|status|branch|switch>");
             std::process::exit(1);
         }
     }

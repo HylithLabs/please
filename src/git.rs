@@ -137,3 +137,104 @@ pub fn push(branch: &str) -> bool {
         .map(|status| status.success())
         .unwrap_or(false)
 }
+
+/// Working-tree changes as (XY status code, path) pairs, straight from
+/// `git status --porcelain` — staged/unstaged is collapsed away by the
+/// caller since `please` never asks a dev to think in those terms.
+pub fn status_entries() -> Vec<(String, String)> {
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .expect("failed to run git status --porcelain");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| line.len() > 3)
+        .map(|line| (line[..2].to_string(), line[3..].to_string()))
+        .collect()
+}
+
+/// The upstream tracking branch (e.g. `origin/main`), or `None` if this
+/// branch isn't tracking anything yet.
+pub fn upstream_branch() -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if name.is_empty() { None } else { Some(name) }
+}
+
+/// (commits ahead, commits behind) HEAD is relative to `upstream`.
+pub fn ahead_behind(upstream: &str) -> Option<(usize, usize)> {
+    let output = Command::new("git")
+        .args(["rev-list", "--left-right", "--count", &format!("HEAD...{upstream}")])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut parts = text.split_whitespace();
+    let ahead = parts.next()?.parse().ok()?;
+    let behind = parts.next()?.parse().ok()?;
+    Some((ahead, behind))
+}
+
+/// Local branches as (name, is_current) pairs.
+pub fn list_branches() -> Vec<(String, bool)> {
+    let output = Command::new("git")
+        .args(["branch", "--format=%(HEAD)%(refname:short)"])
+        .output()
+        .expect("failed to run git branch");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| {
+            let mut chars = line.chars();
+            let marker = chars.next().unwrap_or(' ');
+            (chars.as_str().to_string(), marker == '*')
+        })
+        .collect()
+}
+
+pub fn branch_exists(name: &str) -> bool {
+    Command::new("git")
+        .args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{name}")])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+pub fn create_and_switch_branch(name: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["checkout", "-b", name])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+pub fn switch_branch(name: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["checkout", name])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
