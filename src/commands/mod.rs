@@ -1,7 +1,15 @@
 pub mod branch;
+pub mod cleanup;
 pub mod commit;
+pub mod discard;
+pub mod log;
+pub mod move_commit;
 pub mod push;
+pub mod redo;
+pub mod rename;
+pub mod restore;
 pub mod setup;
 pub mod status;
 pub mod switch;
 pub mod sync;
+pub mod undo;

@@ -34,7 +34,7 @@ pub fn run() {
     println!("Run `please commit` to save these changes.");
 }
 
-fn classify(code: &str) -> &'static str {
+pub(crate) fn classify(code: &str) -> &'static str {
     if code.starts_with("??") {
         "new file:"
     } else if code.contains('D') {

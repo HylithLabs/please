@@ -1,8 +1,9 @@
 use crate::git;
 
 pub fn run(args: &[String]) {
-    match args.first() {
+    match args.first().map(String::as_str) {
         None => list(),
+        Some("delete") => delete(&args[1..]),
         Some(name) => create(name),
     }
 }
@@ -31,5 +32,37 @@ fn create(name: &str) {
             eprintln!("Failed to create branch '{name}': {err}");
             std::process::exit(1);
         }
+    }
+}
+
+fn delete(args: &[String]) {
+    let Some(name) = args.first() else {
+        eprintln!("usage: please branch delete <name>");
+        std::process::exit(1);
+    };
+
+    if !git::branch_exists(name) {
+        eprintln!("Branch '{name}' doesn't exist locally.");
+        std::process::exit(1);
+    }
+
+    if git::current_branch() == *name {
+        eprintln!("Can't delete '{name}' — it's the branch you're on. Switch to another branch first.");
+        std::process::exit(1);
+    }
+
+    if let Err(err) = git::delete_local_branch(name) {
+        eprintln!("Failed to delete local branch '{name}': {err}");
+        std::process::exit(1);
+    }
+    println!("Deleted local branch '{name}'.");
+
+    if !git::has_remote_branch(name) {
+        return;
+    }
+
+    match git::delete_remote_branch(name) {
+        Ok(()) => println!("Deleted remote branch 'origin/{name}'."),
+        Err(err) => eprintln!("Local branch deleted, but failed to delete remote branch: {err}"),
     }
 }

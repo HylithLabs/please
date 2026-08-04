@@ -19,8 +19,18 @@ fn main() {
         Some("branch") => commands::branch::run(&args[2..]),
         Some("switch") => commands::switch::run(&args[2..]),
         Some("sync") => commands::sync::run(&args[2..]),
+        Some("undo") => commands::undo::run(),
+        Some("redo") => commands::redo::run(),
+        Some("move-commit") => commands::move_commit::run(&args[2..]),
+        Some("discard") => commands::discard::run(),
+        Some("restore") => commands::restore::run(&args[2..]),
+        Some("rename") => commands::rename::run(&args[2..]),
+        Some("cleanup") => commands::cleanup::run(),
+        Some("log") => commands::log::run(),
         _ => {
-            eprintln!("usage: please <setup|commit|push|status|branch|switch|sync>");
+            eprintln!(
+                "usage: please <setup|commit|push|status|branch|switch|sync|undo|redo|move-commit|discard|restore|rename|cleanup|log>"
+            );
             std::process::exit(1);
         }
     }

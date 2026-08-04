@@ -1,3 +1,5 @@
+use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 pub fn stage_all() {
@@ -299,4 +301,184 @@ pub fn switch_branch(name: &str) -> Result<(), String> {
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
     }
+}
+
+fn run_ok(args: &[&str]) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(args)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+pub fn has_parent_commit() -> bool {
+    // `.output()`, not `.status()`: rev-parse's `-q` only silences the error
+    // message — on success it still writes the resolved SHA to stdout, which
+    // `.status()` would leak straight into our own output.
+    Command::new("git")
+        .args(["rev-parse", "--verify", "-q", "HEAD~1"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+pub fn last_commit_message() -> String {
+    let output = Command::new("git")
+        .args(["log", "-1", "--pretty=%s"])
+        .output()
+        .expect("failed to run git log -1");
+
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+pub fn reset_soft_head1() -> Result<(), String> {
+    run_ok(&["reset", "--soft", "HEAD~1"])
+}
+
+pub fn reset_soft(target: &str) -> Result<(), String> {
+    run_ok(&["reset", "--soft", target])
+}
+
+pub fn head_sha() -> String {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .expect("failed to run git rev-parse HEAD");
+
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+pub fn commit_parent(commit: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", &format!("{commit}^")])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn undo_marker_path() -> PathBuf {
+    PathBuf::from(".git/PLEASE_UNDO")
+}
+
+/// Remembers the commit `please undo` just rewound past, so `please redo`
+/// can bring it back — a one-slot undo stack, not a full history.
+pub fn record_undo(commit: &str) {
+    let _ = fs::write(undo_marker_path(), commit);
+}
+
+pub fn take_undo_marker() -> Option<String> {
+    let sha = fs::read_to_string(undo_marker_path()).ok()?;
+    let sha = sha.trim().to_string();
+    (!sha.is_empty()).then_some(sha)
+}
+
+pub fn clear_undo_marker() {
+    let _ = fs::remove_file(undo_marker_path());
+}
+
+pub fn reset_hard_head1() -> Result<(), String> {
+    run_ok(&["reset", "--hard", "HEAD~1"])
+}
+
+pub fn reset_hard_head() -> Result<(), String> {
+    run_ok(&["reset", "--hard", "HEAD"])
+}
+
+pub fn create_branch_at_head(name: &str) -> Result<(), String> {
+    run_ok(&["branch", name])
+}
+
+pub fn clean_untracked() -> Result<(), String> {
+    run_ok(&["clean", "-fd"])
+}
+
+/// Most recent commit that deleted `path`, or `None` if it was never deleted.
+pub fn find_deleting_commit(path: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["log", "--diff-filter=D", "--pretty=%H", "-1", "--", path])
+        .output()
+        .ok()?;
+
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if sha.is_empty() { None } else { Some(sha) }
+}
+
+pub fn restore_file_from_commit(commit: &str, path: &str) -> Result<(), String> {
+    run_ok(&["checkout", &format!("{commit}^"), "--", path])
+}
+
+pub fn delete_local_branch(name: &str) -> Result<(), String> {
+    run_ok(&["branch", "-d", name])
+}
+
+pub fn has_remote_branch(name: &str) -> bool {
+    Command::new("git")
+        .args(["show-ref", "--verify", "--quiet", &format!("refs/remotes/origin/{name}")])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+pub fn delete_remote_branch(name: &str) -> Result<(), String> {
+    run_ok(&["push", "origin", "--delete", name])
+}
+
+pub fn rename_branch(new_name: &str) -> Result<(), String> {
+    run_ok(&["branch", "-m", new_name])
+}
+
+/// The repo's primary branch: the remote's default if known (only cached
+/// locally after a `clone`), else `main`/`master` if either exists locally,
+/// else whatever branch we're currently on.
+pub fn default_branch() -> String {
+    let output = Command::new("git")
+        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .output();
+
+    if let Ok(output) = output {
+        if output.status.success() {
+            let full = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if let Some(name) = full.strip_prefix("refs/remotes/origin/") {
+                return name.to_string();
+            }
+        }
+    }
+
+    ["main", "master"]
+        .into_iter()
+        .find(|name| branch_exists(name))
+        .map(str::to_string)
+        .unwrap_or_else(current_branch)
+}
+
+/// Local branches already merged into `base`, excluding `base` itself.
+pub fn merged_branches(base: &str) -> Vec<String> {
+    let output = Command::new("git")
+        .args(["branch", "--format=%(refname:short)", "--merged", base])
+        .output()
+        .expect("failed to run git branch --merged");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|name| *name != base)
+        .map(str::to_string)
+        .collect()
+}
+
+pub fn log_graph() -> bool {
+    Command::new("git")
+        .args(["log", "--oneline", "--graph", "--decorate", "-20"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }

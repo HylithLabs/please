@@ -54,6 +54,38 @@ Fetches and merges the current branch's upstream in (like `git pull`). Reports "
 
 Makes the local branch match its remote exactly — discards local commits and uncommitted changes not on the remote (untracked files are left alone). Destructive, so it shows exactly what will be lost and requires typing `yes` to proceed.
 
+### `please undo` / `please redo`
+
+Undoes the last commit — replaces `git reset --soft HEAD~1` — leaving its changes back in your working tree so you can fix them and try again. `please redo` brings it back, as long as history hasn't moved on since (a new commit invalidates it).
+
+### `please move-commit <branch>`
+
+Fixes "committed to the wrong branch": moves your last commit onto a new branch and switches you to it — replaces `git branch new && git reset --hard HEAD~1 && git checkout new`. Refuses if you have uncommitted changes, so nothing else gets swept up in the move.
+
+### `please discard`
+
+Throws away all uncommitted changes, tracked and untracked — replaces `git checkout -- . && git clean -fd`. Shows exactly what will be lost and requires typing `yes` to proceed.
+
+### `please restore <path>`
+
+Brings back a file that was deleted in a past commit — replaces hunting through `git log --diff-filter=D` for the deleting commit and `git checkout <sha>^ -- <path>`.
+
+### `please branch delete <name>`
+
+Deletes a branch locally and on `origin` in one step — replaces `git branch -d name && git push origin --delete name`. Refuses to delete the branch you're currently on.
+
+### `please rename <new-name>`
+
+Renames the current branch, including on the remote if it's been pushed — replaces `git branch -m old new && git push origin -u new && git push origin --delete old`.
+
+### `please cleanup`
+
+Deletes local branches already merged into the repo's main branch — replaces `git branch --merged main | grep -v main | xargs git branch -d`. Only ever removes branches git already considers safe to delete (`git branch -d`, not `-D`).
+
+### `please log`
+
+A readable commit graph — replaces remembering `git log --oneline --graph --decorate`.
+
 ## Design notes
 
 - **No hand-written git.** Every git operation a developer needs is reachable through a `please` command.
