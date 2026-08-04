@@ -12,6 +12,7 @@ pub mod rename;
 pub mod restore;
 pub mod revert;
 pub mod setup;
+pub mod stash;
 pub mod status;
 pub mod switch;
 pub mod sync;

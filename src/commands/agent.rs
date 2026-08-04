@@ -54,12 +54,13 @@ fn build_system_prompt(project_context: Option<&str>) -> String {
          run_git, run_gh, and run_please. You never read, write, or edit files directly — every \
          action goes through git, gh, or a please subcommand.\n\n\
          Prefer run_please for anything it already covers (branching, syncing, undoing, \
-         committing, cleanup, restoring deleted files, reverting commits, and so on). Fall back \
-         to run_git or run_gh for things please doesn't wrap: inspecting state, tags, stashes, \
+         committing, cleanup, restoring deleted files, reverting commits, stashing, and so on). \
+         Fall back to run_git or run_gh for things please doesn't wrap: inspecting state, tags, \
          diffs, GitHub PRs/issues, and the like.\n\n\
          A few please subcommands normally ask for interactive confirmation before doing \
-         something destructive (please discard, please sync exactly, please revert, and please \
-         switch when the branch doesn't exist yet). Run through you, they can't be confirmed \
+         something destructive (please discard, please sync exactly, please revert, please \
+         stash drop, and please switch when the branch doesn't exist yet). Run through you, \
+         they can't be confirmed \
          non-interactively, so they'll cancel themselves and say so — that's not a bug, don't \
          retry them. Tell the developer to run that command directly so they can confirm it \
          themselves. To create a new branch, use `please branch <name>` (creates and switches, \
@@ -111,7 +112,7 @@ fn tool_specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "run_please",
-            description: "Run a `please` subcommand: one of status, branch, switch, sync, undo, redo, move-commit, discard, restore, rename, cleanup, log, revert, commit, push. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name).",
+            description: "Run a `please` subcommand: one of status, branch, switch, sync, undo, redo, move-commit, discard, restore, rename, cleanup, log, revert, stash, commit, push. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, or list/pop/drop for stash).",
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

@@ -108,6 +108,10 @@ A readable commit graph — replaces remembering `git log --oneline --graph --de
 
 Interactive, no AI involved. Lists your recent commits with a serial number and hash next to each; you pick one either way, and it's reverted — replaces hunting down a SHA with `git log` and running `git revert <sha>` yourself. Won't run into a wall of uncommitted changes either: if your tree is dirty it tells you up front to `please commit` or `please discard` first, and if the revert itself conflicts, it lists the conflicting files and tells you to resolve them and `please commit`, or `please discard` to cancel — never just a raw git error.
 
+### `please stash` / `please stash list` / `please stash pop` / `please stash drop`
+
+No AI involved. `please stash` saves everything in the working tree, tracked and untracked, and clears it, so you can switch context and come back later — replaces `git stash push -u`. `please stash list` shows what's saved. `please stash pop` restores the most recent one; if it conflicts, it lists the conflicting files and tells you to resolve them and `please commit`, or `please discard` to cancel the restore, which cleanly cancels it without losing the stash. `please stash drop` deletes the most recent one outright, showing what it is and requiring `yes` first since it can't be recovered afterward.
+
 ### `please "<what you want to do>"`
 
 Agent mode: anything you type that isn't one of the commands above is treated as a plain-language request. The AI figures out how to do it and acts on your behalf — it never edits files directly, only ever acting through `git`, `gh`, or another `please` subcommand, calling itself recursively where that helps (e.g. "commit and clean up merged branches" might run `please commit` then `please cleanup`).
@@ -121,7 +125,7 @@ please "open a PR for this branch"
 
 Two safety nets, not one:
 - Anything destructive run via raw `git`/`gh` (force-push, `reset --hard`, `branch -D`, deleting things) stops and asks you to confirm before running.
-- Any `please` subcommand that would normally ask for confirmation itself (`please discard`, `please sync exactly`, `please revert`, creating a branch via `please switch`) can't be rubber-stamped by the agent — it cancels itself exactly as it would for any non-interactive caller, and the agent relays that back to you rather than pretending it succeeded, so you can run it yourself and confirm it directly.
+- Any `please` subcommand that would normally ask for confirmation itself (`please discard`, `please sync exactly`, `please revert`, `please stash drop`, creating a branch via `please switch`) can't be rubber-stamped by the agent — it cancels itself exactly as it would for any non-interactive caller, and the agent relays that back to you rather than pretending it succeeded, so you can run it yourself and confirm it directly.
 
 Built to add new providers without touching the agent loop: the tool-calling conversation is represented in provider-neutral terms internally, and only a small adapter per provider (Gemini, Claude, ChatGPT) translates that to and from its own wire format.
 

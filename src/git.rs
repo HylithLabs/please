@@ -524,3 +524,36 @@ pub fn log_graph() -> bool {
         .map(|status| status.success())
         .unwrap_or(false)
 }
+
+/// Stashes everything in the working tree, tracked and untracked — a
+/// developer stashing before a branch switch usually means "everything I've
+/// touched," not just what git already knows about.
+pub fn stash_push() -> Result<(), String> {
+    run_ok(&["stash", "push", "-u"])
+}
+
+/// Restores the most recent stash and removes it from the list. On a
+/// conflict, git leaves the stash entry in place rather than dropping it —
+/// `please discard` cleanly cancels the attempt without losing it.
+pub fn stash_pop() -> Result<(), String> {
+    run_ok(&["stash", "pop"])
+}
+
+pub fn drop_latest_stash() -> Result<(), String> {
+    run_ok(&["stash", "drop"])
+}
+
+pub fn has_stash() -> bool {
+    !stash_list().is_empty()
+}
+
+/// Stash entries, most recent first, as their one-line description (the
+/// part after `git stash list`'s `stash@{N}: ` prefix).
+pub fn stash_list() -> Vec<String> {
+    let output = Command::new("git")
+        .args(["stash", "list", "--pretty=%gs"])
+        .output()
+        .expect("failed to run git stash list");
+
+    String::from_utf8_lossy(&output.stdout).lines().map(str::to_string).collect()
+}
