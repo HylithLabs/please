@@ -75,7 +75,7 @@ pub fn describe_codebase(
     api_key: &str,
     model: Option<&str>,
 ) -> Result<GenerationOutcome, String> {
-    let prompt = build_description_prompt(file_list);
+    let prompt = super::build_description_prompt(file_list);
     generate_with_retry("Analyzing codebase", &prompt, api_key, model, None)
 }
 
@@ -87,10 +87,10 @@ pub fn plan_commits(
     api_key: &str,
     model: Option<&str>,
 ) -> Result<CommitPlanOutcome, String> {
-    let prompt = build_commit_plan_prompt(diff, context);
+    let prompt = super::build_commit_plan_prompt(diff, context);
     let generation_config = GenerationConfig {
         response_mime_type: "application/json".to_string(),
-        response_schema: commit_plan_schema(),
+        response_schema: to_gemini_schema(&super::commit_plan_schema()),
     };
 
     let outcome = generate_with_retry(
@@ -117,29 +117,6 @@ pub fn plan_commits(
 #[derive(Deserialize)]
 struct RawCommitPlan {
     commits: Vec<CommitGroup>,
-}
-
-fn commit_plan_schema() -> serde_json::Value {
-    serde_json::json!({
-        "type": "OBJECT",
-        "properties": {
-            "commits": {
-                "type": "ARRAY",
-                "items": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "files": {
-                            "type": "ARRAY",
-                            "items": { "type": "STRING" }
-                        },
-                        "message": { "type": "STRING" }
-                    },
-                    "required": ["files", "message"]
-                }
-            }
-        },
-        "required": ["commits"]
-    })
 }
 
 /// Calls Gemini with the given prompt. If the configured model fails (e.g. it
@@ -217,37 +194,11 @@ fn call_gemini(
         .ok_or_else(|| "Gemini returned no content".to_string())
 }
 
-fn build_commit_plan_prompt(diff: &str, context: Option<&str>) -> String {
-    let mut prompt = String::new();
-
-    if let Some(context) = context {
-        prompt.push_str("Project context:\n");
-        prompt.push_str(context);
-        prompt.push_str("\n\n");
-    }
-
-    prompt.push_str(
-        "You are an autonomous git agent. Below is the full diff of every changed file in the \
-         working tree; each file's section starts with a `diff --git a/<path> b/<path>` \
-         header. Decide how to split these changes into one or more logically coherent \
-         commits: group files that belong to the same unit of work together, and separate \
-         unrelated changes into different commits. If all the changes belong together, return \
-         a single commit. For each commit, list the exact file paths (relative to the repo \
-         root, exactly as they appear in the diff headers) and write a concise, \
-         conventional-commit style message.\n\nDiff:\n",
-    );
-    prompt.push_str(diff);
-    prompt
-}
-
-fn build_description_prompt(file_list: &str) -> String {
-    format!(
-        "You are analyzing a software repository. Based on the list of tracked files below, \
-         write a short description (3-6 sentences) of what this codebase is and does: its \
-         purpose, its main components, and its language/tech stack. Output only the \
-         description itself, with no markdown formatting, no headings, and no explanation.\n\n\
-         Tracked files:\n{file_list}"
-    )
+/// A cheap, side-effect-free way to confirm a key actually authenticates —
+/// used by `please setup` to catch a bad key immediately instead of it
+/// surfacing confusingly later, on the first real `please commit`.
+pub fn validate_api_key(api_key: &str) -> Result<(), String> {
+    fetch_models(api_key).map(|_| ())
 }
 
 /// Picks the lowest-cost Gemini model available to this API key: prefers
