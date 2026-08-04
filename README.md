@@ -1,6 +1,6 @@
 # Please Git
 
-An AI-native git CLI. You never type raw `git` commands — you run `please` commands, and an AI agent (currently Google Gemini) handles staging, commit messages, and pushing on your behalf.
+An AI-native git CLI. You never type raw `git` commands — you run `please` commands, and an AI agent (Anthropic Claude, Google Gemini, or OpenAI ChatGPT — your choice) handles staging, commit messages, and pushing on your behalf.
 
 Git remains the engine underneath; `please` is the interface.
 
@@ -18,7 +18,24 @@ Run once per machine:
 please setup
 ```
 
-You'll pick an LLM provider and paste an API key (Google AI Studio for Gemini). This is saved globally to `~/.please/config` and applies to every project on the machine. On first use in a repo, `please` also generates a short project description cached at `.git/PLEASE.MD`, giving the AI context about the codebase.
+You'll pick a provider — **Anthropic** (Claude), **Google** (Gemini), or **OpenAI** (ChatGPT) — and paste an API key. `please` checks the key against the provider right away (a real, cheap call — listing available models) so a typo gets caught immediately instead of failing confusingly on your first `please commit`; if it fails, you're offered another try without restarting setup. It then auto-picks the cheapest model the key has access to — no need to know model names or pricing tiers. This is saved globally to `~/.please/config` and applies to every project on the machine.
+
+You can save keys for more than one provider — adding a second one never overwrites the first — and switch which is active any time. Re-run `please setup` and it shows what's already configured, then lets you add or update a provider, switch the active one, or remove a saved key:
+
+```
+Providers you've set up:
+  * Anthropic (model: claude-haiku-4-5, key ending in ...ab12)
+    Google (model: models/gemini-flash-lite-latest, key ending in ...hnxg)
+  (* = active — this is what `please` uses right now)
+
+What would you like to do?
+  1) Add or update a provider
+  2) Switch the active provider
+  3) Remove a saved provider
+  4) Nothing — just checking
+```
+
+On first use in a repo, `please` also generates a short project description cached at `.git/PLEASE.MD`, giving the AI context about the codebase.
 
 ## Commands
 
@@ -105,7 +122,7 @@ Two safety nets, not one:
 - Anything destructive run via raw `git`/`gh` (force-push, `reset --hard`, `branch -D`, deleting things) stops and asks you to confirm before running.
 - Any `please` subcommand that would normally ask for confirmation itself (`please discard`, `please sync exactly`, `please revert`, creating a branch via `please switch`) can't be rubber-stamped by the agent — it cancels itself exactly as it would for any non-interactive caller, and the agent relays that back to you rather than pretending it succeeded, so you can run it yourself and confirm it directly.
 
-Built to add new providers without touching the agent loop: the tool-calling conversation is represented in provider-neutral terms internally, and only a small adapter (currently just Gemini's) translates that to and from a given provider's wire format.
+Built to add new providers without touching the agent loop: the tool-calling conversation is represented in provider-neutral terms internally, and only a small adapter per provider (Gemini, Claude, ChatGPT) translates that to and from its own wire format.
 
 ### `please chat`
 
@@ -128,7 +145,7 @@ Type `exit`/`quit` or press Ctrl+D to leave. Same tools, same safety nets as `pl
 
 - **No hand-written git.** Every git operation a developer needs is reachable through a `please` command.
 - **Explicit overrides, not blanket blocks.** Guardrails (sensitive files, junk directories) can always be bypassed by staging the file yourself first — the tool assumes intent over blocking outright.
-- **Bounded AI latency.** Gemini's own response time isn't something we control, but everything around it is: requests are timeout-bounded, progress is printed so the CLI never looks frozen, and the model is auto-selected once at setup (self-healing on failure) rather than re-selected on every call.
+- **Bounded AI latency.** The model's own response time isn't something we control, but everything around it is: requests are timeout-bounded, progress is printed so the CLI never looks frozen, and the model is auto-selected once at setup (self-healing on failure) rather than re-selected on every call.
 - **Destructive operations require confirmation.** Anything that can discard work (`please sync exactly`) explains the consequences up front and requires explicit confirmation.
 
 ## Roadmap
