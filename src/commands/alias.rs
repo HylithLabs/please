@@ -16,12 +16,12 @@ fn create(name: &str) {
         std::process::exit(1);
     }
 
-    let exe = current_exe();
+    let exe = please_command_path();
     let link = exe.with_file_name(name);
 
     if let Some(existing_alias) = alias_target(&link, &exe) {
         if existing_alias {
-            println!("`{name}` is already aliased to please.");
+            print_already_aliased(name, &exe);
             return;
         }
         eprintln!(
@@ -44,15 +44,34 @@ fn create(name: &str) {
     }
 
     match create_symlink(&exe, &link) {
-        Ok(()) => println!(
+        Ok(()) if dir_is_on_path(exe.parent()) => println!(
             "Done. `{name}` now runs please, exactly like typing `please` yourself. It's a \
              real command, not a shell alias, so it works in every shell and in scripts too."
         ),
+        Ok(()) => print_not_on_path(name, &exe),
         Err(err) => {
             eprintln!("Couldn't create '{name}': {err}");
             std::process::exit(1);
         }
     }
+}
+
+fn print_already_aliased(name: &str, exe: &Path) {
+    if dir_is_on_path(exe.parent()) {
+        println!("`{name}` is already aliased to please.");
+    } else {
+        println!("`{name}` is already aliased to please, but isn't runnable yet:");
+        print_not_on_path(name, exe);
+    }
+}
+
+fn print_not_on_path(name: &str, exe: &Path) {
+    let dir = exe.parent().map(Path::display).map(|d| d.to_string()).unwrap_or_default();
+    println!(
+        "please itself lives at {dir}, which isn't on your PATH, so `{name}` won't run yet. \
+         Add it (e.g. `export PATH=\"{dir}:$PATH\"` in your shell's rc file), then open a new \
+         shell."
+    );
 }
 
 fn remove(args: &[String]) {
@@ -61,7 +80,7 @@ fn remove(args: &[String]) {
         std::process::exit(1);
     };
 
-    let exe = current_exe();
+    let exe = please_command_path();
     let link = exe.with_file_name(name);
 
     match alias_target(&link, &exe) {
@@ -84,7 +103,7 @@ fn remove(args: &[String]) {
 }
 
 fn list() {
-    let exe = current_exe();
+    let exe = please_command_path();
     let Some(dir) = exe.parent() else {
         println!("No aliases set up yet.");
         return;
@@ -155,10 +174,27 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn current_exe() -> PathBuf {
-    std::env::current_exe()
-        .and_then(|path| path.canonicalize())
-        .expect("failed to resolve the please binary's own path")
+/// Where a fresh shell actually finds `please` when you type it: a `PATH`
+/// search for a file literally named `please`. This matters because
+/// `std::env::current_exe()` answers a different question — it names the
+/// process image that's *currently running*, which for a dev setup that
+/// invokes `please` through a wrapper (a shim script that runs `cargo
+/// run`, for instance) is a build artifact buried outside `PATH`
+/// entirely. Aliasing to that would create a symlink no shell can ever
+/// find. Falls back to `current_exe()` only if `please` truly isn't on
+/// `PATH` at all, so this still does something reasonable in that case.
+fn please_command_path() -> PathBuf {
+    find_on_path("please", None)
+        .or_else(|| std::env::current_exe().ok())
+        .and_then(|path| path.canonicalize().ok())
+        .expect("could not determine where the please command lives")
+}
+
+fn dir_is_on_path(dir: Option<&Path>) -> bool {
+    let (Some(dir), Some(path_var)) = (dir, std::env::var_os("PATH")) else {
+        return false;
+    };
+    std::env::split_paths(&path_var).any(|entry| entry == dir)
 }
 
 #[cfg(unix)]
