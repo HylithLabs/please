@@ -166,14 +166,14 @@ fn generate_with_retry(
         None => select_lowest_cost_model(api_key),
     };
 
-    eprintln!("{label} (model: {current_model})...");
+    crate::ui::step(&format!("{label} (model: {current_model})"));
 
     match call_chatgpt(prompt, api_key, &current_model, &format) {
         Ok(message) => Ok(GenerationOutcome { message, model_used: current_model }),
         Err(err) => {
-            eprintln!("Warning: model '{current_model}' failed ({err}). Re-selecting a model...");
+            crate::ui::warn(&format!("model '{current_model}' failed ({err}). Re-selecting a model."));
             current_model = select_lowest_cost_model(api_key);
-            eprintln!("{label} (model: {current_model})...");
+            crate::ui::step(&format!("{label} (model: {current_model})"));
             let message = call_chatgpt(prompt, api_key, &current_model, &format)?;
             Ok(GenerationOutcome { message, model_used: current_model })
         }
@@ -239,7 +239,7 @@ pub fn select_lowest_cost_model(api_key: &str) -> String {
     match fetch_models(api_key) {
         Ok(models) => pick_lowest_cost_model(models).unwrap_or_else(|| FALLBACK_MODEL.to_string()),
         Err(err) => {
-            eprintln!("Warning: model auto-detection failed ({err}). Using fallback model.");
+            crate::ui::warn(&format!("model auto-detection failed ({err}). Using fallback model."));
             FALLBACK_MODEL.to_string()
         }
     }

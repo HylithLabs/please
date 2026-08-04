@@ -8,6 +8,7 @@ mod git;
 mod gitignore;
 mod llm;
 mod sensitive;
+mod ui;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

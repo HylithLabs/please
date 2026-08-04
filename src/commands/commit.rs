@@ -14,10 +14,10 @@ pub fn run() {
     for file in git::staged_files() {
         if !already_staged.contains(&file) && sensitive::is_sensitive(&file) {
             git::unstage_file(&file);
-            eprintln!(
-                "Skipped staging '{file}' — looks like a secret/credential file. \
+            crate::ui::warn(&format!(
+                "skipped staging '{file}', looks like a secret/credential file. \
                  Run `git add {file}` yourself first if you want it included."
-            );
+            ));
         }
     }
 
@@ -29,7 +29,7 @@ pub fn run() {
     }
 
     let Some(mut cfg) = config::load() else {
-        eprintln!("No LLM provider configured. Run `please setup` first.");
+        crate::ui::error("No LLM provider configured. Run `please setup` first.");
         std::process::exit(1);
     };
 
@@ -48,31 +48,39 @@ pub fn run() {
             }
             let _ = config::save(&cfg);
 
-            for group in outcome.commits {
+            let total = outcome.commits.len();
+            for (index, group) in outcome.commits.into_iter().enumerate() {
                 if !git::stage_files(&group.files) {
-                    eprintln!("Skipping commit — failed to stage {:?}", group.files);
+                    crate::ui::error(&format!("skipping commit, failed to stage {:?}", group.files));
                     continue;
                 }
 
+                if total > 1 {
+                    crate::ui::step(&format!("Commit {}/{total}", index + 1));
+                }
+
                 if git::commit(&group.message) {
-                    println!("Committed: {}", group.message.lines().next().unwrap_or(""));
+                    crate::ui::success(&format!(
+                        "Committed: {}",
+                        group.message.lines().next().unwrap_or("")
+                    ));
                     for file in &group.files {
-                        println!("  {file}");
+                        crate::ui::detail(file);
                     }
                 } else {
-                    eprintln!("Failed to commit {:?}", group.files);
+                    crate::ui::error(&format!("failed to commit {:?}", group.files));
                 }
             }
 
             if git::has_pending_changes() {
-                eprintln!(
-                    "Note: some changes were left uncommitted (not covered by the AI's commit plan)."
+                crate::ui::warn(
+                    "some changes were left uncommitted (not covered by the AI's commit plan).",
                 );
             }
         }
         Err(err) => {
             let _ = config::save(&cfg);
-            eprintln!("Failed to plan commits: {err}");
+            crate::ui::error(&format!("failed to plan commits: {err}"));
             std::process::exit(1);
         }
     }
