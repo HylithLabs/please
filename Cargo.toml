@@ -2,11 +2,18 @@
 name = "please"
 version = "0.1.0"
 edition = "2024"
+authors = ["Raiyan Bin Rashid <raiyanbinrashid0@gmail.com>"]
 description = "An AI-native git CLI. You never type raw git commands."
 license = "Apache-2.0"
 repository = "https://github.com/HylithLabs/please"
 homepage = "https://github.com/HylithLabs/please"
 readme = "README.md"
+
+[package.metadata.wix]
+upgrade-guid = "7077AC17-B90D-4753-9524-23B45C53C304"
+path-guid = "3D3F9CF7-BE4C-45E3-A21F-F442B48602E1"
+license = false
+eula = false
 
 [dependencies]
 axoupdater = { version = "0.10.0", features = ["blocking"] }
