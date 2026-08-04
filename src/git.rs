@@ -194,12 +194,20 @@ pub fn reset_hard(target: &str) -> Result<(), String> {
     }
 }
 
-pub fn has_conflicts() -> bool {
-    Command::new("git")
+pub fn conflicted_files() -> Vec<String> {
+    let output = Command::new("git")
         .args(["diff", "--name-only", "--diff-filter=U"])
         .output()
-        .map(|output| !output.stdout.is_empty())
-        .unwrap_or(false)
+        .expect("failed to run git diff --diff-filter=U");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+pub fn has_conflicts() -> bool {
+    !conflicted_files().is_empty()
 }
 
 /// Working-tree changes as (XY status code, path) pairs, straight from
@@ -473,6 +481,40 @@ pub fn merged_branches(base: &str) -> Vec<String> {
         .filter(|name| *name != base)
         .map(str::to_string)
         .collect()
+}
+
+/// Recent commits as (short hash, subject) pairs, most recent first.
+pub fn recent_commits(count: usize) -> Vec<(String, String)> {
+    let output = Command::new("git")
+        .args(["log", &format!("-{count}"), "--pretty=%h\t%s"])
+        .output()
+        .expect("failed to run git log");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.split_once('\t'))
+        .map(|(hash, subject)| (hash.to_string(), subject.to_string()))
+        .collect()
+}
+
+/// Resolves any commit-ish (short hash, full hash, ref) to its full SHA,
+/// or `None` if it doesn't name a real commit.
+pub fn resolve_commit(reference: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", &format!("{reference}^{{commit}}")])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!sha.is_empty()).then_some(sha)
+}
+
+pub fn revert_commit(commit: &str) -> Result<(), String> {
+    run_ok(&["revert", "--no-edit", commit])
 }
 
 pub fn log_graph() -> bool {

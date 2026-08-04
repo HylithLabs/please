@@ -8,6 +8,7 @@ pub mod push;
 pub mod redo;
 pub mod rename;
 pub mod restore;
+pub mod revert;
 pub mod setup;
 pub mod status;
 pub mod switch;

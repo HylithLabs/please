@@ -86,6 +86,10 @@ Deletes local branches already merged into the repo's main branch — replaces `
 
 A readable commit graph — replaces remembering `git log --oneline --graph --decorate`.
 
+### `please revert`
+
+Interactive, no AI involved. Lists your recent commits with a serial number and hash next to each; you pick one either way, and it's reverted — replaces hunting down a SHA with `git log` and running `git revert <sha>` yourself. Won't run into a wall of uncommitted changes either: if your tree is dirty it tells you up front to `please commit` or `please discard` first, and if the revert itself conflicts, it lists the conflicting files and tells you to resolve them and `please commit`, or `please discard` to cancel — never just a raw git error.
+
 ## Design notes
 
 - **No hand-written git.** Every git operation a developer needs is reachable through a `please` command.

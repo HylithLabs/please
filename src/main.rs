@@ -27,9 +27,10 @@ fn main() {
         Some("rename") => commands::rename::run(&args[2..]),
         Some("cleanup") => commands::cleanup::run(),
         Some("log") => commands::log::run(),
+        Some("revert") => commands::revert::run(),
         _ => {
             eprintln!(
-                "usage: please <setup|commit|push|status|branch|switch|sync|undo|redo|move-commit|discard|restore|rename|cleanup|log>"
+                "usage: please <setup|commit|push|status|branch|switch|sync|undo|redo|move-commit|discard|restore|rename|cleanup|log|revert>"
             );
             std::process::exit(1);
         }
