@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod branch;
 pub mod cleanup;
 pub mod commit;

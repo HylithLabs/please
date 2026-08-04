@@ -68,7 +68,7 @@ struct ModelInfo {
     supported_generation_methods: Vec<String>,
 }
 
-use super::{CommitGroup, CommitPlanOutcome, GenerationOutcome};
+use super::{AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec};
 
 pub fn describe_codebase(
     file_list: &str,
@@ -315,4 +315,231 @@ fn pick_lowest_cost_model(models: Vec<ModelInfo>) -> Option<String> {
 
     flash_candidates.sort();
     flash_candidates.pop()
+}
+
+// --- Agent mode (function calling) -----------------------------------------
+//
+// Separate wire format from the plain-prompt calls above: agent turns need
+// `systemInstruction`, `tools`, and round-tripped function call/response
+// parts, none of which the simple `generateContent` calls use.
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+struct WirePart {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+    #[serde(rename = "functionCall", skip_serializing_if = "Option::is_none")]
+    function_call: Option<WireFunctionCall>,
+    #[serde(rename = "functionResponse", skip_serializing_if = "Option::is_none")]
+    function_response: Option<WireFunctionResponse>,
+    // "Thinking" models attach this to a functionCall part and require it
+    // echoed back verbatim on the next turn, or they reject the request.
+    #[serde(rename = "thoughtSignature", skip_serializing_if = "Option::is_none")]
+    thought_signature: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct WireFunctionCall {
+    name: String,
+    #[serde(default)]
+    args: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct WireFunctionResponse {
+    name: String,
+    response: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct WireContent {
+    role: String,
+    parts: Vec<WirePart>,
+}
+
+#[derive(Serialize)]
+struct AgentRequest {
+    contents: Vec<WireContent>,
+    #[serde(rename = "systemInstruction")]
+    system_instruction: WireContent,
+    tools: Vec<WireToolGroup>,
+}
+
+#[derive(Serialize)]
+struct WireToolGroup {
+    #[serde(rename = "functionDeclarations")]
+    function_declarations: Vec<WireFunctionDeclaration>,
+}
+
+#[derive(Serialize)]
+struct WireFunctionDeclaration {
+    name: &'static str,
+    description: &'static str,
+    parameters: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+struct AgentApiResponse {
+    #[serde(default)]
+    candidates: Vec<AgentCandidate>,
+}
+
+#[derive(Deserialize)]
+struct AgentCandidate {
+    content: WireContent,
+}
+
+/// JSON Schema uses lowercase type names (`"object"`, `"string"`, ...);
+/// Gemini's function-declaration schema wants them uppercase. Everything
+/// else about the schema passes through unchanged.
+fn to_gemini_schema(schema: &serde_json::Value) -> serde_json::Value {
+    match schema {
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.iter()
+                .map(|(key, value)| {
+                    let converted = match (key.as_str(), value) {
+                        ("type", serde_json::Value::String(t)) => {
+                            serde_json::Value::String(t.to_uppercase())
+                        }
+                        _ => to_gemini_schema(value),
+                    };
+                    (key.clone(), converted)
+                })
+                .collect(),
+        ),
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(to_gemini_schema).collect())
+        }
+        other => other.clone(),
+    }
+}
+
+fn to_wire_history(history: &[AgentMessage]) -> Vec<WireContent> {
+    history
+        .iter()
+        .map(|message| match message {
+            AgentMessage::User(text) => WireContent {
+                role: "user".to_string(),
+                parts: vec![WirePart {
+                    text: Some(text.clone()),
+                    ..Default::default()
+                }],
+            },
+            AgentMessage::Model(calls) => WireContent {
+                role: "model".to_string(),
+                parts: calls
+                    .iter()
+                    .map(|call| WirePart {
+                        function_call: Some(WireFunctionCall {
+                            name: call.name.clone(),
+                            args: call.args.clone(),
+                            id: Some(call.id.clone()),
+                        }),
+                        thought_signature: call.thought_signature.clone(),
+                        ..Default::default()
+                    })
+                    .collect(),
+            },
+            // Gemini doesn't accept a "function" role for tool results — the
+            // response turn is sent back as "user", same as a normal reply.
+            AgentMessage::ToolResults(outcomes) => WireContent {
+                role: "user".to_string(),
+                parts: outcomes
+                    .iter()
+                    .map(|outcome| WirePart {
+                        function_response: Some(WireFunctionResponse {
+                            name: outcome.name.clone(),
+                            response: serde_json::json!({ "result": outcome.output }),
+                            id: Some(outcome.id.clone()),
+                        }),
+                        ..Default::default()
+                    })
+                    .collect(),
+            },
+        })
+        .collect()
+}
+
+/// Runs one turn of agent function-calling: sends the conversation so far
+/// plus the tool catalog, and returns either the tool calls the model wants
+/// executed, or its final answer.
+pub fn agent_turn(
+    system_prompt: &str,
+    history: &[AgentMessage],
+    tools: &[ToolSpec],
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<AgentTurn, String> {
+    let model = model
+        .map(str::to_string)
+        .unwrap_or_else(|| select_lowest_cost_model(api_key));
+
+    let request = AgentRequest {
+        contents: to_wire_history(history),
+        system_instruction: WireContent {
+            role: "system".to_string(),
+            parts: vec![WirePart {
+                text: Some(system_prompt.to_string()),
+                ..Default::default()
+            }],
+        },
+        tools: vec![WireToolGroup {
+            function_declarations: tools
+                .iter()
+                .map(|tool| WireFunctionDeclaration {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: to_gemini_schema(&tool.parameters),
+                })
+                .collect(),
+        }],
+    };
+
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/{model}:generateContent");
+
+    let mut response = ureq::post(&url)
+        .header("Content-Type", "application/json")
+        .header("X-goog-api-key", api_key)
+        .config()
+        .timeout_global(Some(GENERATION_TIMEOUT))
+        .build()
+        .send_json(&request)
+        .map_err(|e| format!("Gemini request failed: {e}"))?;
+
+    let parsed: AgentApiResponse = response
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("failed to parse Gemini response: {e}"))?;
+
+    let content = parsed
+        .candidates
+        .into_iter()
+        .next()
+        .map(|c| c.content)
+        .ok_or_else(|| "Gemini returned no content".to_string())?;
+
+    let mut tool_calls = Vec::new();
+    let mut text_parts = Vec::new();
+
+    for (i, part) in content.parts.into_iter().enumerate() {
+        if let Some(call) = part.function_call {
+            tool_calls.push(ToolCall {
+                id: call.id.unwrap_or_else(|| format!("call_{i}")),
+                name: call.name,
+                args: call.args,
+                thought_signature: part.thought_signature,
+            });
+        } else if let Some(text) = part.text {
+            text_parts.push(text);
+        }
+    }
+
+    if tool_calls.is_empty() {
+        Ok(AgentTurn::Final(text_parts.join("\n").trim().to_string()))
+    } else {
+        Ok(AgentTurn::ToolCalls(tool_calls))
+    }
 }

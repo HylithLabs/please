@@ -90,6 +90,23 @@ A readable commit graph — replaces remembering `git log --oneline --graph --de
 
 Interactive, no AI involved. Lists your recent commits with a serial number and hash next to each; you pick one either way, and it's reverted — replaces hunting down a SHA with `git log` and running `git revert <sha>` yourself. Won't run into a wall of uncommitted changes either: if your tree is dirty it tells you up front to `please commit` or `please discard` first, and if the revert itself conflicts, it lists the conflicting files and tells you to resolve them and `please commit`, or `please discard` to cancel — never just a raw git error.
 
+### `please "<what you want to do>"`
+
+Agent mode: anything you type that isn't one of the commands above is treated as a plain-language request. The AI figures out how to do it and acts on your behalf — it never edits files directly, only ever acting through `git`, `gh`, or another `please` subcommand, calling itself recursively where that helps (e.g. "commit and clean up merged branches" might run `please commit` then `please cleanup`).
+
+```
+please "clean up branches that are already merged into main"
+please "what changed in the last 3 commits?"
+please "I broke something, undo my last commit"
+please "open a PR for this branch"
+```
+
+Two safety nets, not one:
+- Anything destructive run via raw `git`/`gh` (force-push, `reset --hard`, `branch -D`, deleting things) stops and asks you to confirm before running.
+- Any `please` subcommand that would normally ask for confirmation itself (`please discard`, `please sync exactly`, `please revert`, creating a branch via `please switch`) can't be rubber-stamped by the agent — it cancels itself exactly as it would for any non-interactive caller, and the agent relays that back to you rather than pretending it succeeded, so you can run it yourself and confirm it directly.
+
+Built to add new providers without touching the agent loop: the tool-calling conversation is represented in provider-neutral terms internally, and only a small adapter (currently just Gemini's) translates that to and from a given provider's wire format.
+
 ## Design notes
 
 - **No hand-written git.** Every git operation a developer needs is reachable through a `please` command.
