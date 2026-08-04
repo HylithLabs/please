@@ -1,13 +1,15 @@
+use crate::commands::commit;
 use crate::git;
 
 pub fn run() {
-    git::stage_all();
-    let diff = git::diff_staged();
+    commit::run();
 
-    if diff.is_empty() {
-        println!("No changes to commit.");
-        return;
+    let branch = git::current_branch();
+
+    if !git::push(&branch) {
+        eprintln!("Failed to push to origin/{branch}");
+        std::process::exit(1);
     }
 
-    print!("{diff}");
+    println!("Pushed to origin/{branch}");
 }
