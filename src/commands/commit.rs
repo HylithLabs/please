@@ -22,17 +22,41 @@ pub fn run() {
         cfg.model = Some(model);
     }
 
-    match llm::generate_commit_message(&diff, project_context.as_deref(), &cfg) {
+    // Unstage — the diff above was just for planning. We re-stage per commit below.
+    git::unstage_all();
+
+    match llm::plan_commits(&diff, project_context.as_deref(), &cfg) {
         Ok(outcome) => {
             if cfg.model.as_deref() != Some(outcome.model_used.as_str()) {
                 cfg.model = Some(outcome.model_used);
             }
             let _ = config::save(&cfg);
-            println!("{}", outcome.message);
+
+            for group in outcome.commits {
+                if !git::stage_files(&group.files) {
+                    eprintln!("Skipping commit — failed to stage {:?}", group.files);
+                    continue;
+                }
+
+                if git::commit(&group.message) {
+                    println!("Committed: {}", group.message.lines().next().unwrap_or(""));
+                    for file in &group.files {
+                        println!("  {file}");
+                    }
+                } else {
+                    eprintln!("Failed to commit {:?}", group.files);
+                }
+            }
+
+            if git::has_pending_changes() {
+                eprintln!(
+                    "Note: some changes were left uncommitted (not covered by the AI's commit plan)."
+                );
+            }
         }
         Err(err) => {
             let _ = config::save(&cfg);
-            eprintln!("Failed to generate commit message: {err}");
+            eprintln!("Failed to plan commits: {err}");
             std::process::exit(1);
         }
     }

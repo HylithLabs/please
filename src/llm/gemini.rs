@@ -6,6 +6,16 @@ const FALLBACK_MODEL: &str = "models/gemini-2.5-flash-lite";
 #[derive(Serialize)]
 struct GenerateRequest<'a> {
     contents: Vec<Content<'a>>,
+    #[serde(rename = "generationConfig", skip_serializing_if = "Option::is_none")]
+    generation_config: Option<GenerationConfig>,
+}
+
+#[derive(Serialize, Clone)]
+struct GenerationConfig {
+    #[serde(rename = "responseMimeType")]
+    response_mime_type: String,
+    #[serde(rename = "responseSchema")]
+    response_schema: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -51,17 +61,7 @@ struct ModelInfo {
     supported_generation_methods: Vec<String>,
 }
 
-use super::GenerationOutcome;
-
-pub fn generate_commit_message(
-    diff: &str,
-    context: Option<&str>,
-    api_key: &str,
-    model: Option<&str>,
-) -> Result<GenerationOutcome, String> {
-    let prompt = build_commit_prompt(diff, context);
-    generate_with_retry(&prompt, api_key, model)
-}
+use super::{CommitGroup, CommitPlanOutcome, GenerationOutcome};
 
 pub fn describe_codebase(
     file_list: &str,
@@ -69,7 +69,64 @@ pub fn describe_codebase(
     model: Option<&str>,
 ) -> Result<GenerationOutcome, String> {
     let prompt = build_description_prompt(file_list);
-    generate_with_retry(&prompt, api_key, model)
+    generate_with_retry(&prompt, api_key, model, None)
+}
+
+/// Lets the model decide how to split the working tree's changes into one or
+/// more logically coherent commits, each with its own file list and message.
+pub fn plan_commits(
+    diff: &str,
+    context: Option<&str>,
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<CommitPlanOutcome, String> {
+    let prompt = build_commit_plan_prompt(diff, context);
+    let generation_config = GenerationConfig {
+        response_mime_type: "application/json".to_string(),
+        response_schema: commit_plan_schema(),
+    };
+
+    let outcome = generate_with_retry(&prompt, api_key, model, Some(generation_config))?;
+
+    let plan: RawCommitPlan = serde_json::from_str(&outcome.message)
+        .map_err(|e| format!("failed to parse commit plan JSON: {e}"))?;
+
+    if plan.commits.is_empty() {
+        return Err("model returned an empty commit plan".to_string());
+    }
+
+    Ok(CommitPlanOutcome {
+        commits: plan.commits,
+        model_used: outcome.model_used,
+    })
+}
+
+#[derive(Deserialize)]
+struct RawCommitPlan {
+    commits: Vec<CommitGroup>,
+}
+
+fn commit_plan_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "OBJECT",
+        "properties": {
+            "commits": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "files": {
+                            "type": "ARRAY",
+                            "items": { "type": "STRING" }
+                        },
+                        "message": { "type": "STRING" }
+                    },
+                    "required": ["files", "message"]
+                }
+            }
+        },
+        "required": ["commits"]
+    })
 }
 
 /// Calls Gemini with the given prompt. If the configured model fails (e.g. it
@@ -79,13 +136,14 @@ fn generate_with_retry(
     prompt: &str,
     api_key: &str,
     model: Option<&str>,
+    generation_config: Option<GenerationConfig>,
 ) -> Result<GenerationOutcome, String> {
     let mut current_model = match model {
         Some(model) => model.to_string(),
         None => select_lowest_cost_model(api_key),
     };
 
-    match call_gemini(prompt, api_key, &current_model) {
+    match call_gemini(prompt, api_key, &current_model, generation_config.clone()) {
         Ok(message) => Ok(GenerationOutcome {
             message,
             model_used: current_model,
@@ -95,7 +153,7 @@ fn generate_with_retry(
                 "Warning: model '{current_model}' failed ({err}). Re-selecting a model..."
             );
             current_model = select_lowest_cost_model(api_key);
-            let message = call_gemini(prompt, api_key, &current_model)?;
+            let message = call_gemini(prompt, api_key, &current_model, generation_config)?;
             Ok(GenerationOutcome {
                 message,
                 model_used: current_model,
@@ -104,11 +162,17 @@ fn generate_with_retry(
     }
 }
 
-fn call_gemini(prompt: &str, api_key: &str, model: &str) -> Result<String, String> {
+fn call_gemini(
+    prompt: &str,
+    api_key: &str,
+    model: &str,
+    generation_config: Option<GenerationConfig>,
+) -> Result<String, String> {
     let request = GenerateRequest {
         contents: vec![Content {
             parts: vec![Part { text: prompt }],
         }],
+        generation_config,
     };
 
     let url = format!("https://generativelanguage.googleapis.com/v1beta/{model}:generateContent");
@@ -133,7 +197,7 @@ fn call_gemini(prompt: &str, api_key: &str, model: &str) -> Result<String, Strin
         .ok_or_else(|| "Gemini returned no content".to_string())
 }
 
-fn build_commit_prompt(diff: &str, context: Option<&str>) -> String {
+fn build_commit_plan_prompt(diff: &str, context: Option<&str>) -> String {
     let mut prompt = String::new();
 
     if let Some(context) = context {
@@ -143,10 +207,14 @@ fn build_commit_prompt(diff: &str, context: Option<&str>) -> String {
     }
 
     prompt.push_str(
-        "You are generating a git commit message. Write a concise, conventional-commit style \
-         message (a short summary line, optionally followed by a brief body) describing the \
-         following diff. Output only the commit message itself, with no markdown formatting, \
-         no code fences, and no explanation.\n\nDiff:\n",
+        "You are an autonomous git agent. Below is the full diff of every changed file in the \
+         working tree; each file's section starts with a `diff --git a/<path> b/<path>` \
+         header. Decide how to split these changes into one or more logically coherent \
+         commits: group files that belong to the same unit of work together, and separate \
+         unrelated changes into different commits. If all the changes belong together, return \
+         a single commit. For each commit, list the exact file paths (relative to the repo \
+         root, exactly as they appear in the diff headers) and write a concise, \
+         conventional-commit style message.\n\nDiff:\n",
     );
     prompt.push_str(diff);
     prompt
