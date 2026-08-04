@@ -18,9 +18,9 @@ Run once per machine:
 please setup
 ```
 
-You'll pick a provider: **Anthropic** (Claude), **Google** (Gemini), or **OpenAI** (ChatGPT), and paste an API key. `please` checks the key against the provider right away (a real, cheap call: listing available models), so a typo gets caught immediately instead of failing confusingly on your first `please commit`; if it fails, you're offered another try without restarting setup. It then auto-picks the cheapest model the key has access to, so there's no need to know model names or pricing tiers. This is saved globally to `~/.please/config` and applies to every project on the machine.
+You'll pick a provider: **Anthropic** (Claude), **Google** (Gemini), or **OpenAI** (ChatGPT), and paste an API key. `please` checks the key against the provider right away (a real, cheap call: listing available models), so a typo gets caught immediately instead of failing confusingly on your first `please commit`; if it fails, you're offered another try without restarting setup. It then auto-picks the cheapest model the key has access to, so there's no need to know model names or pricing tiers, though you can decline the pick and type a specific model id yourself if you'd rather choose. This is saved globally to `~/.please/config` and applies to every project on the machine.
 
-You can save keys for more than one provider (adding a second one never overwrites the first), and switch which is active any time. Re-run `please setup` and it shows what's already configured, then lets you add or update a provider, switch the active one, or remove a saved key:
+You can save keys for more than one provider (adding a second one never overwrites the first), switch which is active any time, and change a saved provider's model later without re-entering its key. Re-run `please setup` and it shows what's already configured, then lets you add or update a provider, switch the active one, change a provider's model, or remove a saved key:
 
 ```
 Providers you've set up:
@@ -31,8 +31,9 @@ Providers you've set up:
 What would you like to do?
   1) Add or update a provider
   2) Switch the active provider
-  3) Remove a saved provider
-  4) Nothing, just checking
+  3) Change a provider's model
+  4) Remove a saved provider
+  5) Nothing, just checking
 ```
 
 On first use in a repo, `please` also generates a short project description cached at `.git/PLEASE.MD`, giving the AI context about the codebase.

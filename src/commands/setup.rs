@@ -24,13 +24,15 @@ pub fn run() {
     println!("\nWhat would you like to do?");
     println!("  1) Add or update a provider");
     println!("  2) Switch the active provider");
-    println!("  3) Remove a saved provider");
-    println!("  4) Nothing, just checking");
+    println!("  3) Change a provider's model");
+    println!("  4) Remove a saved provider");
+    println!("  5) Nothing, just checking");
 
-    match prompt("Choose (1-4): ").as_str() {
+    match prompt("Choose (1-5): ").as_str() {
         "1" => add_or_update_provider(),
         "2" => switch_active(&saved),
-        "3" => remove_provider(&saved),
+        "3" => change_model(&saved),
+        "4" => remove_provider(&saved),
         _ => println!("Nothing changed."),
     }
 }
@@ -38,15 +40,14 @@ pub fn run() {
 fn print_saved(saved: &[ProviderInfo]) {
     println!("Providers you've set up:");
     for info in saved {
-        let marker = if info.active { "*" } else { " " };
+        let marker = if info.active { "-" } else { " " };
         println!(
-            "  {marker} {} (model: {}, key ending in {})",
+            "  {marker} {} (model: {}, key: {})",
             display_name(&info.provider),
             info.model.as_deref().unwrap_or("auto-selected"),
             mask_key(&info.api_key),
         );
     }
-    println!("  (* = active: this is what `please` uses right now)");
 }
 
 fn add_or_update_provider() {
@@ -57,12 +58,7 @@ fn add_or_update_provider() {
 
     let provider = select_provider();
     let api_key = collect_and_validate_key(&provider);
-
-    println!("Selecting the lowest-cost model for {}...", display_name(&provider));
-    let model = llm::select_model(&provider, &api_key);
-    if let Some(model) = &model {
-        println!("Selected model: {model}");
-    }
+    let model = choose_model(&provider, &api_key);
 
     config::save(&Config { provider: provider.clone(), api_key, model }).expect("failed to save config");
 
@@ -70,6 +66,58 @@ fn add_or_update_provider() {
         "\nSetup complete. please will use {} for AI features. Run `please commit` to try it out.",
         display_name(&provider)
     );
+}
+
+/// Lets the developer change a saved provider's model without touching its
+/// key or which provider is active.
+fn change_model(saved: &[ProviderInfo]) {
+    println!("\nChange the model for which provider?");
+    for (i, info) in saved.iter().enumerate() {
+        println!("  {}) {} (currently: {})", i + 1, display_name(&info.provider), info.model.as_deref().unwrap_or("auto-selected"));
+    }
+
+    let Some(choice) = pick(&prompt("Choose a number: "), saved.len()) else {
+        eprintln!("Not a valid choice. Nothing changed.");
+        return;
+    };
+
+    let target = &saved[choice];
+    let model = choose_model(&target.provider, &target.api_key);
+
+    match config::update_model(&target.provider, model) {
+        Ok(()) => println!("Updated {}.", display_name(&target.provider)),
+        Err(err) => eprintln!("Couldn't update it: {err}"),
+    }
+}
+
+/// Picks the model to use for `provider`: auto-selects the cheapest one the
+/// key currently has access to and offers to keep it, or lets the
+/// developer type a specific model id instead, overriding the automated
+/// pick. `api_key` is only used for the auto-selection call.
+fn choose_model(provider: &str, api_key: &str) -> Option<String> {
+    println!("Selecting the lowest-cost model for {}...", display_name(provider));
+    let auto = llm::select_model(provider, api_key);
+
+    if let Some(model) = &auto {
+        println!("Auto-selected model: {model}");
+        if confirm("Use this model? [Y/n]: ", true) {
+            return auto;
+        }
+    } else {
+        println!("No auto-selection available for {}. You'll need to enter one.", display_name(provider));
+    }
+
+    loop {
+        let custom = prompt("Enter the model ID to use: ");
+        if !custom.is_empty() {
+            return Some(custom);
+        }
+        if let Some(model) = &auto {
+            println!("Keeping the auto-selected model: {model}");
+            return auto;
+        }
+        eprintln!("Model ID can't be empty.");
+    }
 }
 
 fn switch_active(saved: &[ProviderInfo]) {

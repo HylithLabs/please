@@ -151,6 +151,18 @@ pub fn save(config: &Config) -> io::Result<()> {
     write_store(&store)
 }
 
+/// Updates just a provider's saved model, leaving its key and the active
+/// provider untouched. `None` clears it back to auto-selection.
+pub fn update_model(provider: &str, model: Option<String>) -> Result<(), String> {
+    let mut store = read_store();
+    let entry = store.providers.get_mut(provider).filter(|entry| entry.api_key.is_some());
+    let Some(entry) = entry else {
+        return Err(format!("No saved key for '{provider}'."));
+    };
+    entry.model = model;
+    write_store(&store).map_err(|e| e.to_string())
+}
+
 /// Every provider with a saved key, active one first, for `please setup`
 /// to display and choose among.
 pub fn list() -> Vec<ProviderInfo> {
