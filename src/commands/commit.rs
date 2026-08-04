@@ -2,9 +2,22 @@ use crate::config;
 use crate::context;
 use crate::git;
 use crate::llm;
+use crate::sensitive;
 
 pub fn run() {
+    let already_staged = git::staged_files();
     git::stage_all();
+
+    for file in git::staged_files() {
+        if !already_staged.contains(&file) && sensitive::is_sensitive(&file) {
+            git::unstage_file(&file);
+            eprintln!(
+                "Skipped staging '{file}' — looks like a secret/credential file. \
+                 Run `git add {file}` yourself first if you want it included."
+            );
+        }
+    }
+
     let diff = git::diff_staged();
 
     if diff.is_empty() {

@@ -5,6 +5,7 @@ mod config;
 mod context;
 mod git;
 mod llm;
+mod sensitive;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

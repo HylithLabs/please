@@ -39,6 +39,24 @@ pub fn list_tracked_files() -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+pub fn staged_files() -> Vec<String> {
+    let output = Command::new("git")
+        .args(["diff", "--staged", "--name-only"])
+        .output()
+        .expect("failed to run git diff --staged --name-only");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(String::from)
+        .collect()
+}
+
+pub fn unstage_file(path: &str) {
+    let _ = Command::new("git")
+        .args(["restore", "--staged", "--", path])
+        .status();
+}
+
 pub fn unstage_all() {
     let status = Command::new("git")
         .args(["restore", "--staged", "."])
