@@ -6,6 +6,8 @@ Git remains the engine underneath; `please` is the interface.
 
 Run `please` with no arguments (or `please help`) any time for a full command reference, grouped by what you're trying to do.
 
+Typos and filler words don't block a command either — `please swich to master` still runs `please switch master`. A typo'd command word is recognized if it's one edit away from a real command (a wrong letter, a missing one, an extra one, or two adjacent letters swapped) and isn't also close to some *other* command, and small connector words like "to"/"into"/"the"/"a"/"an" are dropped before the real argument is passed through. Anything looser than that is deliberately left alone and handed to the AI agent instead — "clean up my messy code" should ask the AI to look at your code, not silently run `please cleanup` and start deleting branches.
+
 ## Install
 
 ```bash
