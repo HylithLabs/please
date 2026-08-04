@@ -1,35 +1,20 @@
 use std::env;
-use std::process::Command;
+
+mod commands;
+mod config;
+mod git;
+mod llm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     match args.get(1).map(String::as_str) {
-        Some("push") => cmd_push(),
+        Some("commit") => commands::commit::run(),
+        Some("push") => commands::push::run(),
+        Some("setup") => commands::setup::run(),
         _ => {
-            eprintln!("usage: please push");
+            eprintln!("usage: please <setup|commit|push>");
             std::process::exit(1);
         }
     }
-}
-
-fn cmd_push() {
-    let output = Command::new("git")
-        .args(["diff", "--staged"])
-        .output()
-        .expect("failed to run git diff --staged");
-
-    if !output.status.success() {
-        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-        std::process::exit(1);
-    }
-
-    let diff = String::from_utf8_lossy(&output.stdout);
-
-    if diff.is_empty() {
-        println!("No staged changes.");
-        return;
-    }
-
-    print!("{diff}");
 }
