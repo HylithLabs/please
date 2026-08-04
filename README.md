@@ -1,5 +1,5 @@
 <div align="center">
-  # PLEASE
+  PLEASE
 </div>
 
 An AI-native git CLI. You never type raw `git` commands — you run `please` commands, and an AI agent (Anthropic Claude, Google Gemini, or OpenAI ChatGPT — your choice) handles staging, commit messages, and pushing on your behalf.
