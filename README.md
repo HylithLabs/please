@@ -116,6 +116,17 @@ Interactive, no AI involved. Lists your recent commits with a serial number and 
 
 No AI involved. `please stash` saves everything in the working tree, tracked and untracked, and clears it, so you can switch context and come back later — replaces `git stash push -u`. `please stash list` shows what's saved. `please stash pop` restores the most recent one; if it conflicts, it lists the conflicting files and tells you to resolve them and `please commit`, or `please discard` to cancel the restore, which cleanly cancels it without losing the stash. `please stash drop` deletes the most recent one outright, showing what it is and requiring `yes` first since it can't be recovered afterward.
 
+### `please purge <path>`
+
+Permanently removes a file or folder from your entire git history, not just the working tree, the boring, error-prone task of scrubbing a leaked secret or an accidentally committed file out of every commit that ever touched it. Uses `git filter-repo` if it's installed (git's own recommended tool for this), falling back to the built-in `git filter-branch` otherwise, then cleans up the now-unreachable objects so the old content is actually gone, not just unreferenced.
+
+This rewrites commit hashes for the file's entire history and everything after it, so it shows you exactly what that means and requires typing `yes` first. If you have an `origin` remote, a single `yes` also force-pushes the rewritten history there right after, since a leaked secret is still live on the remote until that happens; you're told upfront that's part of the plan, and every collaborator needs to re-clone or `please sync exactly` afterward, since their local history has now diverged permanently.
+
+```
+please purge secrets.env
+please purge config/credentials
+```
+
 ### `please "<what you want to do>"`
 
 Agent mode: anything you type that isn't one of the commands above is treated as a plain-language request. The AI figures out how to do it and acts on your behalf — it never edits files directly, only ever acting through `git`, `gh`, or another `please` subcommand, calling itself recursively where that helps (e.g. "commit and clean up merged branches" might run `please commit` then `please cleanup`).

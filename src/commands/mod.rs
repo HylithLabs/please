@@ -8,6 +8,7 @@ pub mod discard;
 pub mod help;
 pub mod log;
 pub mod move_commit;
+pub mod purge;
 pub mod push;
 pub mod redo;
 pub mod rename;

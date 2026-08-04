@@ -44,6 +44,7 @@ pub fn run() {
 
     println!("HISTORY");
     print_cmd("log", "a readable commit graph");
+    print_cmd("purge <path>", "permanently remove a file or folder from all git history");
     println!();
 
     println!("SHORTCUTS");

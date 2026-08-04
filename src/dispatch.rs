@@ -21,6 +21,7 @@ const COMMANDS: &[(&str, fn(&[String]))] = &[
     ("log", |_| commands::log::run()),
     ("revert", |_| commands::revert::run()),
     ("stash", commands::stash::run),
+    ("purge", commands::purge::run),
     ("chat", |_| commands::chat::run()),
     ("alias", commands::alias::run),
     ("help", |_| commands::help::run()),

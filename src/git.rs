@@ -557,3 +557,106 @@ pub fn stash_list() -> Vec<String> {
 
     String::from_utf8_lossy(&output.stdout).lines().map(str::to_string).collect()
 }
+
+/// True if `git filter-repo` (git's own recommended replacement for the
+/// deprecated `git filter-branch`) is installed on this machine.
+pub fn filter_repo_available() -> bool {
+    Command::new("git")
+        .args(["filter-repo", "--version"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+/// Rewrites every branch and tag to remove `path` from the entire history,
+/// not just the working tree, via `git filter-repo`. Runs with inherited
+/// stdio so its own progress output shows live, the same as `commit`/`push`.
+pub fn purge_path_with_filter_repo(path: &str) -> bool {
+    Command::new("git")
+        .args(["filter-repo", "--path", path, "--invert-paths", "--force"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+/// Same job as `purge_path_with_filter_repo`, using the slower, built-in
+/// `git filter-branch` for machines without `git-filter-repo` installed. The
+/// path is passed through an env var rather than interpolated into the
+/// index-filter shell script, so spaces or shell metacharacters in it can't
+/// break, or inject into, the per-commit filter command.
+pub fn purge_path_with_filter_branch(path: &str) -> bool {
+    Command::new("git")
+        .env("FILTER_BRANCH_SQUELCH_WARNING", "1")
+        .env("PLEASE_PURGE_PATH", path)
+        .args([
+            "filter-branch",
+            "--force",
+            "--index-filter",
+            "git rm -r --cached --ignore-unmatch -- \"$PLEASE_PURGE_PATH\"",
+            "--prune-empty",
+            "--tag-name-filter",
+            "cat",
+            "--",
+            "--all",
+        ])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+/// Reclaims the space `filter-branch` frees up: it leaves the pre-rewrite
+/// commits reachable from backup refs under `refs/original/`, specifically
+/// so a mistake can be undone, so a plain `gc` alone won't touch them.
+pub fn cleanup_after_filter_branch() -> Result<(), String> {
+    let _ = fs::remove_dir_all(".git/refs/original");
+    run_ok(&["reflog", "expire", "--expire=now", "--all"])?;
+    run_ok(&["gc", "--prune=now", "--aggressive"])
+}
+
+pub fn remote_url(name: &str) -> Option<String> {
+    let output = Command::new("git").args(["remote", "get-url", name]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!url.is_empty()).then_some(url)
+}
+
+pub fn has_remote(name: &str) -> bool {
+    remote_url(name).is_some()
+}
+
+pub fn add_remote(name: &str, url: &str) -> Result<(), String> {
+    run_ok(&["remote", "add", name, url])
+}
+
+/// True if any commit, on any branch, ever touched `path` — including ones
+/// deleted long ago, unlike a plain working-tree check.
+pub fn path_ever_tracked(path: &str) -> bool {
+    Command::new("git")
+        .args(["log", "--all", "--oneline", "--", path])
+        .output()
+        .map(|output| !output.stdout.is_empty())
+        .unwrap_or(false)
+}
+
+/// Force-pushes every local branch and every tag, matching the scope of what
+/// `purge_path_with_filter_repo`/`purge_path_with_filter_branch` just
+/// rewrote (`--all` refs), so the remote actually loses the purged history
+/// too, not just the current branch.
+pub fn force_push_all() -> bool {
+    let branches = Command::new("git")
+        .args(["push", "origin", "--force", "--all"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+
+    let tags = Command::new("git")
+        .args(["push", "origin", "--force", "--tags"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+
+    branches && tags
+}
