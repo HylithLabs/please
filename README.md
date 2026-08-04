@@ -148,6 +148,10 @@ $ please chat
 
 Type `exit`/`quit` or press Ctrl+D to leave. Same tools, same safety nets as `please "..."` — the only difference is the conversation itself persists in memory for the life of the session (nothing is written to disk), so later messages can refer back to what was said or done earlier.
 
+### `please alias <name>` / `please alias` / `please alias remove <name>`
+
+Give `please` a shorter name, like `pls` or `plz`, so casual daily use is less to type. `please alias pls` creates a real symlink next to the `please` binary itself, so `pls` becomes a genuine command, not a shell alias: it works in every shell, in scripts, and doesn't need a new terminal or a sourced rc file to take effect. `please alias` on its own lists what you've set up; `please alias remove <name>` takes one back. If the name you pick already exists as a different program elsewhere on your `PATH`, it warns before shadowing it and asks you to confirm; if it collides with an unrelated file right next to `please` itself, it refuses outright rather than overwriting something that isn't its own.
+
 ## Design notes
 
 - **No hand-written git.** Every git operation a developer needs is reachable through a `please` command.

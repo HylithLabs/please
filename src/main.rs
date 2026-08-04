@@ -30,6 +30,7 @@ fn main() {
         Some("revert") => commands::revert::run(),
         Some("stash") => commands::stash::run(&args[2..]),
         Some("chat") => commands::chat::run(),
+        Some("alias") => commands::alias::run(&args[2..]),
         Some("help") | Some("--help") | Some("-h") => commands::help::run(),
         Some(_) => commands::agent::run(&args[1..].join(" ")),
         None => commands::help::run(),

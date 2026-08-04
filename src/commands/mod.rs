@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod alias;
 pub mod branch;
 pub mod chat;
 pub mod cleanup;

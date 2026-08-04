@@ -46,6 +46,11 @@ pub fn run() {
     print_cmd("log", "a readable commit graph");
     println!();
 
+    println!("SHORTCUTS");
+    print_cmd("alias <name>", "add a shorter command name for please, like pls or plz");
+    print_cmd("alias / alias remove <name>", "list your aliases, or remove one");
+    println!();
+
     println!("Run `please <command>` for any of these, or `please help` to see this again.");
 }
 
