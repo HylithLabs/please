@@ -1,7 +1,14 @@
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 const MODELS_ENDPOINT: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 const FALLBACK_MODEL: &str = "models/gemini-2.5-flash-lite";
+
+// Generation calls can run long (Gemini's own "thinking" pass, out of our
+// control) — bounded generously so a real stall fails fast instead of
+// hanging forever. Model listing is a plain lookup and should always be quick.
+const GENERATION_TIMEOUT: Duration = Duration::from_secs(90);
+const LIST_MODELS_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Serialize)]
 struct GenerateRequest<'a> {
@@ -69,7 +76,7 @@ pub fn describe_codebase(
     model: Option<&str>,
 ) -> Result<GenerationOutcome, String> {
     let prompt = build_description_prompt(file_list);
-    generate_with_retry(&prompt, api_key, model, None)
+    generate_with_retry("Analyzing codebase", &prompt, api_key, model, None)
 }
 
 /// Lets the model decide how to split the working tree's changes into one or
@@ -86,7 +93,13 @@ pub fn plan_commits(
         response_schema: commit_plan_schema(),
     };
 
-    let outcome = generate_with_retry(&prompt, api_key, model, Some(generation_config))?;
+    let outcome = generate_with_retry(
+        "Planning commits",
+        &prompt,
+        api_key,
+        model,
+        Some(generation_config),
+    )?;
 
     let plan: RawCommitPlan = serde_json::from_str(&outcome.message)
         .map_err(|e| format!("failed to parse commit plan JSON: {e}"))?;
@@ -133,6 +146,7 @@ fn commit_plan_schema() -> serde_json::Value {
 /// was deprecated/removed by Google), re-runs model discovery in the
 /// background and retries once with the fresh pick.
 fn generate_with_retry(
+    label: &str,
     prompt: &str,
     api_key: &str,
     model: Option<&str>,
@@ -142,6 +156,8 @@ fn generate_with_retry(
         Some(model) => model.to_string(),
         None => select_lowest_cost_model(api_key),
     };
+
+    eprintln!("{label} (model: {current_model})...");
 
     match call_gemini(prompt, api_key, &current_model, generation_config.clone()) {
         Ok(message) => Ok(GenerationOutcome {
@@ -153,6 +169,7 @@ fn generate_with_retry(
                 "Warning: model '{current_model}' failed ({err}). Re-selecting a model..."
             );
             current_model = select_lowest_cost_model(api_key);
+            eprintln!("{label} (model: {current_model})...");
             let message = call_gemini(prompt, api_key, &current_model, generation_config)?;
             Ok(GenerationOutcome {
                 message,
@@ -180,6 +197,9 @@ fn call_gemini(
     let mut response = ureq::post(&url)
         .header("Content-Type", "application/json")
         .header("X-goog-api-key", api_key)
+        .config()
+        .timeout_global(Some(GENERATION_TIMEOUT))
+        .build()
         .send_json(&request)
         .map_err(|e| format!("Gemini request failed: {e}"))?;
 
@@ -246,6 +266,9 @@ pub fn select_lowest_cost_model(api_key: &str) -> String {
 fn fetch_models(api_key: &str) -> Result<Vec<ModelInfo>, String> {
     let mut response = ureq::get(MODELS_ENDPOINT)
         .header("X-goog-api-key", api_key)
+        .config()
+        .timeout_global(Some(LIST_MODELS_TIMEOUT))
+        .build()
         .call()
         .map_err(|e| format!("failed to list models: {e}"))?;
 
