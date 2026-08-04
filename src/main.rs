@@ -30,12 +30,8 @@ fn main() {
         Some("revert") => commands::revert::run(),
         Some("stash") => commands::stash::run(&args[2..]),
         Some("chat") => commands::chat::run(),
+        Some("help") | Some("--help") | Some("-h") => commands::help::run(),
         Some(_) => commands::agent::run(&args[1..].join(" ")),
-        None => {
-            eprintln!(
-                "usage: please <setup|commit|push|status|branch|switch|sync|undo|redo|move-commit|discard|restore|rename|cleanup|log|revert|stash|chat> or please \"<what you want to do>\""
-            );
-            std::process::exit(1);
-        }
+        None => commands::help::run(),
     }
 }

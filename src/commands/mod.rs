@@ -4,6 +4,7 @@ pub mod chat;
 pub mod cleanup;
 pub mod commit;
 pub mod discard;
+pub mod help;
 pub mod log;
 pub mod move_commit;
 pub mod push;

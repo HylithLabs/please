@@ -4,6 +4,8 @@ An AI-native git CLI. You never type raw `git` commands — you run `please` com
 
 Git remains the engine underneath; `please` is the interface.
 
+Run `please` with no arguments (or `please help`) any time for a full command reference, grouped by what you're trying to do.
+
 ## Install
 
 ```bash
