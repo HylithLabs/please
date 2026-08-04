@@ -7,14 +7,14 @@ const PROVIDERS: [(&str, &str, &str); 4] = [
     ("anthropic", "Anthropic", "Claude"),
     ("google", "Google", "Gemini"),
     ("openai", "ChatGPT", "OpenAI's GPT models"),
-    ("other", "Other provider", "not wired up yet — saves, but won't run anything"),
+    ("other", "Other provider", "not wired up yet, and won't run anything if you save it"),
 ];
 
 pub fn run() {
     let saved = config::list();
 
     if saved.is_empty() {
-        println!("No providers set up yet — let's add one.\n");
+        println!("No providers set up yet. Let's add one.\n");
         add_or_update_provider();
         return;
     }
@@ -25,7 +25,7 @@ pub fn run() {
     println!("  1) Add or update a provider");
     println!("  2) Switch the active provider");
     println!("  3) Remove a saved provider");
-    println!("  4) Nothing — just checking");
+    println!("  4) Nothing, just checking");
 
     match prompt("Choose (1-4): ").as_str() {
         "1" => add_or_update_provider(),
@@ -46,13 +46,13 @@ fn print_saved(saved: &[ProviderInfo]) {
             mask_key(&info.api_key),
         );
     }
-    println!("  (* = active — this is what `please` uses right now)");
+    println!("  (* = active: this is what `please` uses right now)");
 }
 
 fn add_or_update_provider() {
     println!("Who is your model provider?");
     for (i, (_, name, blurb)) in PROVIDERS.iter().enumerate() {
-        println!("  {}) {name} — {blurb}", i + 1);
+        println!("  {}) {name}: {blurb}", i + 1);
     }
 
     let provider = select_provider();
@@ -67,7 +67,7 @@ fn add_or_update_provider() {
     config::save(&Config { provider: provider.clone(), api_key, model }).expect("failed to save config");
 
     println!(
-        "\nSetup complete — please will use {} for AI features. Run `please commit` to try it out.",
+        "\nSetup complete. please will use {} for AI features. Run `please commit` to try it out.",
         display_name(&provider)
     );
 }
@@ -75,7 +75,7 @@ fn add_or_update_provider() {
 fn switch_active(saved: &[ProviderInfo]) {
     let inactive: Vec<&ProviderInfo> = saved.iter().filter(|info| !info.active).collect();
     if inactive.is_empty() {
-        println!("Only one provider is set up — add another first (option 1) before switching.");
+        println!("Only one provider is set up. Add another first (option 1) before switching.");
         return;
     }
 
@@ -85,13 +85,13 @@ fn switch_active(saved: &[ProviderInfo]) {
     }
 
     let Some(choice) = pick(&prompt("Choose a number: "), inactive.len()) else {
-        eprintln!("Not a valid choice — nothing changed.");
+        eprintln!("Not a valid choice. Nothing changed.");
         return;
     };
 
     let provider = &inactive[choice].provider;
     match config::set_active(provider) {
-        Ok(()) => println!("Switched — please now uses {} for AI features.", display_name(provider)),
+        Ok(()) => println!("Switched. please now uses {} for AI features.", display_name(provider)),
         Err(err) => eprintln!("Couldn't switch: {err}"),
     }
 }
@@ -103,7 +103,7 @@ fn remove_provider(saved: &[ProviderInfo]) {
     }
 
     let Some(choice) = pick(&prompt("Choose a number: "), saved.len()) else {
-        eprintln!("Not a valid choice — nothing changed.");
+        eprintln!("Not a valid choice. Nothing changed.");
         return;
     };
 
@@ -125,9 +125,9 @@ fn remove_provider(saved: &[ProviderInfo]) {
 
     let remaining = config::list();
     if remaining.is_empty() {
-        println!("No providers left — run `please setup` to add one.");
+        println!("No providers left. Run `please setup` to add one.");
     } else {
-        println!("That was your active provider — pick a new one:");
+        println!("That was your active provider. Pick a new one:");
         switch_active(&remaining);
     }
 }
@@ -160,7 +160,7 @@ fn select_provider() -> String {
             continue;
         }
         println!(
-            "Note: only Anthropic, Google, and OpenAI are wired up right now — '{name}' will \
+            "Note: only Anthropic, Google, and OpenAI are wired up right now. '{name}' will \
              save, but AI commands will error until it's supported."
         );
         return name;
@@ -184,7 +184,7 @@ fn collect_and_validate_key(provider: &str) -> String {
             Some(Err(err)) => {
                 eprintln!("That key didn't work: {err}");
                 if !confirm("Try a different key? [Y/n]: ", true) {
-                    eprintln!("Keeping it anyway — you can re-run `please setup` any time.");
+                    eprintln!("Keeping it anyway. You can re-run `please setup` any time.");
                     return api_key;
                 }
             }

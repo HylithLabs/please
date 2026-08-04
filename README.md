@@ -18,21 +18,21 @@ Run once per machine:
 please setup
 ```
 
-You'll pick a provider — **Anthropic** (Claude), **Google** (Gemini), or **OpenAI** (ChatGPT) — and paste an API key. `please` checks the key against the provider right away (a real, cheap call — listing available models) so a typo gets caught immediately instead of failing confusingly on your first `please commit`; if it fails, you're offered another try without restarting setup. It then auto-picks the cheapest model the key has access to — no need to know model names or pricing tiers. This is saved globally to `~/.please/config` and applies to every project on the machine.
+You'll pick a provider: **Anthropic** (Claude), **Google** (Gemini), or **OpenAI** (ChatGPT), and paste an API key. `please` checks the key against the provider right away (a real, cheap call: listing available models), so a typo gets caught immediately instead of failing confusingly on your first `please commit`; if it fails, you're offered another try without restarting setup. It then auto-picks the cheapest model the key has access to, so there's no need to know model names or pricing tiers. This is saved globally to `~/.please/config` and applies to every project on the machine.
 
-You can save keys for more than one provider — adding a second one never overwrites the first — and switch which is active any time. Re-run `please setup` and it shows what's already configured, then lets you add or update a provider, switch the active one, or remove a saved key:
+You can save keys for more than one provider (adding a second one never overwrites the first), and switch which is active any time. Re-run `please setup` and it shows what's already configured, then lets you add or update a provider, switch the active one, or remove a saved key:
 
 ```
 Providers you've set up:
   * Anthropic (model: claude-haiku-4-5, key ending in ...ab12)
     Google (model: models/gemini-flash-lite-latest, key ending in ...hnxg)
-  (* = active — this is what `please` uses right now)
+  (* = active: this is what `please` uses right now)
 
 What would you like to do?
   1) Add or update a provider
   2) Switch the active provider
   3) Remove a saved provider
-  4) Nothing — just checking
+  4) Nothing, just checking
 ```
 
 On first use in a repo, `please` also generates a short project description cached at `.git/PLEASE.MD`, giving the AI context about the codebase.
