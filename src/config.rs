@@ -16,14 +16,18 @@ fn config_path() -> PathBuf {
 pub struct Config {
     pub provider: String,
     pub api_key: String,
+    pub model: Option<String>,
 }
 
-pub fn save(provider: &str, api_key: &str) -> io::Result<()> {
+pub fn save(config: &Config) -> io::Result<()> {
     let dir = config_dir();
     fs::create_dir_all(&dir)?;
 
     let path = config_path();
-    let contents = format!("provider={provider}\napi_key={api_key}\n");
+    let mut contents = format!("provider={}\napi_key={}\n", config.provider, config.api_key);
+    if let Some(model) = &config.model {
+        contents.push_str(&format!("model={model}\n"));
+    }
     fs::write(&path, contents)?;
 
     #[cfg(unix)]
@@ -40,17 +44,21 @@ pub fn load() -> Option<Config> {
 
     let mut provider = None;
     let mut api_key = None;
+    let mut model = None;
 
     for line in contents.lines() {
         if let Some(value) = line.strip_prefix("provider=") {
             provider = Some(value.to_string());
         } else if let Some(value) = line.strip_prefix("api_key=") {
             api_key = Some(value.to_string());
+        } else if let Some(value) = line.strip_prefix("model=") {
+            model = Some(value.to_string());
         }
     }
 
     Some(Config {
         provider: provider?,
         api_key: api_key?,
+        model,
     })
 }

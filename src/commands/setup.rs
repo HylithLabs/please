@@ -1,4 +1,5 @@
-use crate::config;
+use crate::config::{self, Config};
+use crate::llm;
 use std::io::{self, Write};
 
 const PROVIDERS: [&str; 4] = ["Anthropic", "Google", "ChatGPT", "Other Provider"];
@@ -27,7 +28,18 @@ pub fn run() {
         std::process::exit(1);
     }
 
-    config::save(&provider, &api_key).expect("failed to save config");
+    println!("Selecting the lowest-cost model for {provider}...");
+    let model = llm::select_model(&provider, &api_key);
+    if let Some(model) = &model {
+        println!("Selected model: {model}");
+    }
+
+    config::save(&Config {
+        provider: provider.clone(),
+        api_key,
+        model,
+    })
+    .expect("failed to save config");
 
     println!("Setup complete. Provider: {provider}");
 }

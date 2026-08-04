@@ -2,6 +2,7 @@ use std::env;
 
 mod commands;
 mod config;
+mod context;
 mod git;
 mod llm;
 

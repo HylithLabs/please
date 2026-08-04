@@ -25,3 +25,16 @@ pub fn diff_staged() -> String {
 
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
+
+pub fn list_tracked_files() -> String {
+    let output = Command::new("git")
+        .args(["ls-files"])
+        .output()
+        .expect("failed to run git ls-files");
+
+    if !output.status.success() {
+        return String::new();
+    }
+
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
