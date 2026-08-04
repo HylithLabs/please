@@ -130,11 +130,73 @@ pub fn current_branch() -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
+/// Always sets the upstream (`-u`) so later `please sync` calls have a
+/// tracking branch to compare against, even on a branch's first push.
 pub fn push(branch: &str) -> bool {
     Command::new("git")
-        .args(["push", "origin", branch])
+        .args(["push", "-u", "origin", branch])
         .status()
         .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+/// Fetches + merges from the current branch's upstream, like `git pull`.
+/// Returns git's informational stdout on success, or the combined
+/// stdout+stderr on failure (which may describe a merge conflict).
+pub fn pull() -> Result<String, String> {
+    // Explicit --no-rebase: newer git refuses to guess a reconcile strategy
+    // when the user's global config doesn't set one, so we pin the classic
+    // "git pull" merge behavior instead of failing on every divergent branch.
+    let output = Command::new("git")
+        .args(["pull", "--no-rebase"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() {
+        Ok(stdout)
+    } else {
+        Err(match (stdout.is_empty(), stderr.is_empty()) {
+            (true, _) => stderr,
+            (false, true) => stdout,
+            (false, false) => format!("{stdout}\n{stderr}"),
+        })
+    }
+}
+
+pub fn fetch() -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["fetch"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+pub fn reset_hard(target: &str) -> Result<(), String> {
+    let output = Command::new("git")
+        .args(["reset", "--hard", target])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+pub fn has_conflicts() -> bool {
+    Command::new("git")
+        .args(["diff", "--name-only", "--diff-filter=U"])
+        .output()
+        .map(|output| !output.stdout.is_empty())
         .unwrap_or(false)
 }
 
