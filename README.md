@@ -10,9 +10,25 @@ Typos and filler words don't block a command either — `please swich to master`
 
 ## Install
 
+macOS / Linux:
+
 ```bash
-cargo install --path .
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/HylithLabs/please/releases/latest/download/please-installer.sh | sh
 ```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/HylithLabs/please/releases/latest/download/please-installer.ps1 | iex"
+```
+
+Homebrew:
+
+```bash
+brew install HylithLabs/please/please
+```
+
+Or build it yourself with `cargo install --path .` if you'd rather not run a prebuilt binary — note that `please update` (below) only works for the prebuilt installs above, since it has no source tree to rebuild from.
 
 ## Setup
 
@@ -116,6 +132,18 @@ Interactive, no AI involved. Lists your recent commits with a serial number and 
 
 No AI involved. `please stash` saves everything in the working tree, tracked and untracked, and clears it, so you can switch context and come back later — replaces `git stash push -u`. `please stash list` shows what's saved. `please stash pop` restores the most recent one; if it conflicts, it lists the conflicting files and tells you to resolve them and `please commit`, or `please discard` to cancel the restore, which cleanly cancels it without losing the stash. `please stash drop` deletes the most recent one outright, showing what it is and requiring `yes` first since it can't be recovered afterward.
 
+### `please squash` / `please squash <n>` / `please squash <branch-or-commit>`
+
+Combines a run of commits into one, AI-written message and all, the other boring, error-prone task nobody enjoys: `git rebase -i`, editing a todo file by hand, resolving whatever it trips on. `please squash` does it with a single `git reset --soft` back to a starting point instead, so there's no rebase to go wrong.
+
+No argument squashes everything ahead of the branch's upstream (or the repo's default branch, if it hasn't been pushed yet) — the usual "clean up before merging" case. A number squashes the last `<n>` commits; a branch or commit name squashes back to it directly (it has to actually be an ancestor of HEAD, so this can't jump the branch somewhere unrelated). Either way, it shows every commit about to be combined and requires typing `yes` first; if the branch has already been pushed, that same `yes` also covers force-pushing the result back with `--force-with-lease`, right after, so it fails safely instead of clobbering anything if someone else pushed to it meanwhile.
+
+```
+please squash
+please squash 3
+please squash main
+```
+
 ### `please purge <path>`
 
 Permanently removes a file or folder from your entire git history, not just the working tree, the boring, error-prone task of scrubbing a leaked secret or an accidentally committed file out of every commit that ever touched it. Uses `git filter-repo` if it's installed (git's own recommended tool for this), falling back to the built-in `git filter-branch` otherwise, then cleans up the now-unreachable objects so the old content is actually gone, not just unreferenced.
@@ -164,6 +192,10 @@ Type `exit`/`quit` or press Ctrl+D to leave. Same tools, same safety nets as `pl
 ### `please alias <name>` / `please alias` / `please alias remove <name>`
 
 Give `please` a shorter name, like `pls` or `plz`, so casual daily use is less to type. `please alias pls` creates a real symlink next to the `please` binary itself, so `pls` becomes a genuine command, not a shell alias: it works in every shell, in scripts, and doesn't need a new terminal or a sourced rc file to take effect. `please alias` on its own lists what you've set up; `please alias remove <name>` takes one back. If the name you pick already exists as a different program elsewhere on your `PATH`, it warns before shadowing it and asks you to confirm; if it collides with an unrelated file right next to `please` itself, it refuses outright rather than overwriting something that isn't its own.
+
+### `please update`
+
+Updates `please` itself to the latest release in place, no reinstalling by hand. Only works if you installed it via the shell/PowerShell installer or Homebrew above — those leave behind a record of how they installed it that this reads; a `cargo install --path .` build has no such record, so it's told to rebuild from source instead of failing mysteriously.
 
 ## Design notes
 
