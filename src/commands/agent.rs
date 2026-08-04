@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 use std::process::Command;
 
-use crate::config;
+use crate::config::{self, Config};
 use crate::context;
 use crate::git;
 use crate::llm::{self, ToolSpec};
@@ -15,6 +15,23 @@ pub fn run(prompt: &str) {
         std::process::exit(1);
     }
 
+    let (cfg, system_prompt, tools) = prepare_session();
+
+    eprintln!("Thinking...");
+
+    match llm::run_agent(prompt, &cfg, &system_prompt, &tools, execute_tool) {
+        Ok(text) => println!("{text}"),
+        Err(err) => {
+            eprintln!("Agent failed: {err}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Loads config, generates/loads the cached project description, and builds
+/// the system prompt and tool catalog every agent invocation needs — shared
+/// between the one-shot `please "..."` and the long-lived `please chat`.
+pub(crate) fn prepare_session() -> (Config, String, Vec<ToolSpec>) {
     let Some(mut cfg) = config::load() else {
         eprintln!("No LLM provider configured. Run `please setup` first.");
         std::process::exit(1);
@@ -27,16 +44,7 @@ pub fn run(prompt: &str) {
     }
 
     let system_prompt = build_system_prompt(project_context.as_deref());
-
-    eprintln!("Thinking...");
-
-    match llm::run_agent(prompt, &cfg, &system_prompt, &tool_specs(), execute_tool) {
-        Ok(text) => println!("{text}"),
-        Err(err) => {
-            eprintln!("Agent failed: {err}");
-            std::process::exit(1);
-        }
-    }
+    (cfg, system_prompt, tool_specs())
 }
 
 fn build_system_prompt(project_context: Option<&str>) -> String {
@@ -116,7 +124,7 @@ fn tool_specs() -> Vec<ToolSpec> {
     ]
 }
 
-fn execute_tool(name: &str, args: &serde_json::Value) -> String {
+pub(crate) fn execute_tool(name: &str, args: &serde_json::Value) -> String {
     match name {
         "run_git" => run_external("git", args),
         "run_gh" => run_external("gh", args),

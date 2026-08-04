@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod branch;
+pub mod chat;
 pub mod cleanup;
 pub mod commit;
 pub mod discard;

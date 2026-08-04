@@ -428,21 +428,27 @@ fn to_wire_history(history: &[AgentMessage]) -> Vec<WireContent> {
                     ..Default::default()
                 }],
             },
-            AgentMessage::Model(calls) => WireContent {
-                role: "model".to_string(),
-                parts: calls
+            AgentMessage::Model { calls, text } => {
+                let mut parts: Vec<WirePart> = text
                     .iter()
-                    .map(|call| WirePart {
-                        function_call: Some(WireFunctionCall {
-                            name: call.name.clone(),
-                            args: call.args.clone(),
-                            id: Some(call.id.clone()),
-                        }),
-                        thought_signature: call.thought_signature.clone(),
+                    .map(|text| WirePart {
+                        text: Some(text.clone()),
                         ..Default::default()
                     })
-                    .collect(),
-            },
+                    .collect();
+
+                parts.extend(calls.iter().map(|call| WirePart {
+                    function_call: Some(WireFunctionCall {
+                        name: call.name.clone(),
+                        args: call.args.clone(),
+                        id: Some(call.id.clone()),
+                    }),
+                    thought_signature: call.thought_signature.clone(),
+                    ..Default::default()
+                }));
+
+                WireContent { role: "model".to_string(), parts }
+            }
             // Gemini doesn't accept a "function" role for tool results — the
             // response turn is sent back as "user", same as a normal reply.
             AgentMessage::ToolResults(outcomes) => WireContent {
@@ -540,6 +546,7 @@ pub fn agent_turn(
     if tool_calls.is_empty() {
         Ok(AgentTurn::Final(text_parts.join("\n").trim().to_string()))
     } else {
-        Ok(AgentTurn::ToolCalls(tool_calls))
+        let text = (!text_parts.is_empty()).then(|| text_parts.join("\n").trim().to_string());
+        Ok(AgentTurn::ToolCalls { calls: tool_calls, text })
     }
 }

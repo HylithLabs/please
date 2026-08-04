@@ -107,6 +107,23 @@ Two safety nets, not one:
 
 Built to add new providers without touching the agent loop: the tool-calling conversation is represented in provider-neutral terms internally, and only a small adapter (currently just Gemini's) translates that to and from a given provider's wire format.
 
+### `please chat`
+
+The same agent, kept alive across multiple messages instead of one and done. Use `please "..."` for a single request; switch to `please chat` when you want to go back and forth — ask a follow-up, correct something, or build up a multi-step task piece by piece, without repeating context each time:
+
+```
+$ please chat
+> what changed since the last commit?
+...
+> undo that last one, actually
+...
+> good, now make a branch for the fix
+...
+> exit
+```
+
+Type `exit`/`quit` or press Ctrl+D to leave. Same tools, same safety nets as `please "..."` — the only difference is the conversation itself persists in memory for the life of the session (nothing is written to disk), so later messages can refer back to what was said or done earlier.
+
 ## Design notes
 
 - **No hand-written git.** Every git operation a developer needs is reachable through a `please` command.

@@ -28,10 +28,11 @@ fn main() {
         Some("cleanup") => commands::cleanup::run(),
         Some("log") => commands::log::run(),
         Some("revert") => commands::revert::run(),
+        Some("chat") => commands::chat::run(),
         Some(_) => commands::agent::run(&args[1..].join(" ")),
         None => {
             eprintln!(
-                "usage: please <setup|commit|push|status|branch|switch|sync|undo|redo|move-commit|discard|restore|rename|cleanup|log|revert> or please \"<what you want to do>\""
+                "usage: please <setup|commit|push|status|branch|switch|sync|undo|redo|move-commit|discard|restore|rename|cleanup|log|revert|chat> or please \"<what you want to do>\""
             );
             std::process::exit(1);
         }
