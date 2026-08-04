@@ -37,7 +37,10 @@ fn create(name: &str) {
             "'{name}' is already a separate program at {}.",
             shadowed.display()
         );
-        if !confirm("Alias it anyway? Whichever comes first on your PATH will win. [y/N]: ", false) {
+        if !confirm(
+            "Alias it anyway? Whichever comes first on your PATH will win. [y/N]: ",
+            false,
+        ) {
             println!("Cancelled.");
             return;
         }
@@ -66,7 +69,11 @@ fn print_already_aliased(name: &str, exe: &Path) {
 }
 
 fn print_not_on_path(name: &str, exe: &Path) {
-    let dir = exe.parent().map(Path::display).map(|d| d.to_string()).unwrap_or_default();
+    let dir = exe
+        .parent()
+        .map(Path::display)
+        .map(|d| d.to_string())
+        .unwrap_or_default();
     println!(
         "please itself lives at {dir}, which isn't on your PATH, so `{name}` won't run yet. \
          Add it (e.g. `export PATH=\"{dir}:$PATH\"` in your shell's rc file), then open a new \
@@ -121,7 +128,9 @@ fn list() {
         .collect();
 
     if aliases.is_empty() {
-        println!("No aliases set up yet. Run `please alias <name>` to add one, like `please alias pls`.");
+        println!(
+            "No aliases set up yet. Run `please alias <name>` to add one, like `please alias pls`."
+        );
         return;
     }
 
@@ -143,7 +152,11 @@ fn alias_target(path: &Path, exe: &Path) -> Option<bool> {
     fs::symlink_metadata(path).ok()?;
 
     let points_at_exe = fs::read_link(path).ok().and_then(|target| {
-        let resolved = if target.is_absolute() { target } else { path.parent()?.join(target) };
+        let resolved = if target.is_absolute() {
+            target
+        } else {
+            path.parent()?.join(target)
+        };
         resolved.canonicalize().ok()
     }) == Some(exe.to_path_buf());
 

@@ -31,7 +31,9 @@ pub fn run() {
     match git::clean_untracked() {
         Ok(()) => println!("Discarded all uncommitted changes."),
         Err(err) => {
-            eprintln!("Tracked changes were discarded, but failed to remove untracked files: {err}");
+            eprintln!(
+                "Tracked changes were discarded, but failed to remove untracked files: {err}"
+            );
             std::process::exit(1);
         }
     }

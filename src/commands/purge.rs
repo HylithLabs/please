@@ -33,7 +33,9 @@ pub fn run(args: &[String]) {
     println!("  - it can't be undone once the rewritten history is pushed");
     if let Some(url) = &origin {
         println!("  - it will also be force-pushed to {url}, right after the rewrite");
-        println!("  - every collaborator will need to re-clone, or `please sync exactly`, afterward");
+        println!(
+            "  - every collaborator will need to re-clone, or `please sync exactly`, afterward"
+        );
     }
     print!("Type 'yes' to continue: ");
     let _ = io::stdout().flush();
@@ -58,7 +60,9 @@ pub fn run(args: &[String]) {
     };
 
     if !rewrite_ok {
-        ui::error(&format!("failed to rewrite history for '{path}'. See git's output above."));
+        ui::error(&format!(
+            "failed to rewrite history for '{path}'. See git's output above."
+        ));
         std::process::exit(1);
     }
 
@@ -74,10 +78,10 @@ pub fn run(args: &[String]) {
 
     // filter-repo drops the origin remote as a safety measure; put it back so
     // the rest of `please` (push, sync, ...) keeps working afterward.
-    if let Some(url) = &origin {
-        if !git::has_remote("origin") {
-            let _ = git::add_remote("origin", url);
-        }
+    if let Some(url) = &origin
+        && !git::has_remote("origin")
+    {
+        let _ = git::add_remote("origin", url);
     }
 
     ui::success(&format!("'{path}' is gone from local history."));
@@ -90,7 +94,9 @@ pub fn run(args: &[String]) {
     ui::step("Force-pushing rewritten history to origin");
     if git::force_push_all() {
         ui::success("Pushed the rewritten history to origin.");
-        println!("Tell every collaborator to re-clone, or run `please sync exactly`, before doing anything else.");
+        println!(
+            "Tell every collaborator to re-clone, or run `please sync exactly`, before doing anything else."
+        );
     } else {
         ui::error(
             "force-push failed. See git's output above. The rewrite itself already succeeded locally.",

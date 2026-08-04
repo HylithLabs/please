@@ -7,7 +7,11 @@ const PROVIDERS: [(&str, &str, &str); 4] = [
     ("anthropic", "Anthropic", "Claude"),
     ("google", "Google", "Gemini"),
     ("openai", "ChatGPT", "OpenAI's GPT models"),
-    ("other", "Other provider", "not wired up yet, and won't run anything if you save it"),
+    (
+        "other",
+        "Other provider",
+        "not wired up yet, and won't run anything if you save it",
+    ),
 ];
 
 pub fn run() {
@@ -60,7 +64,12 @@ fn add_or_update_provider() {
     let api_key = collect_and_validate_key(&provider);
     let model = choose_model(&provider, &api_key);
 
-    config::save(&Config { provider: provider.clone(), api_key, model }).expect("failed to save config");
+    config::save(&Config {
+        provider: provider.clone(),
+        api_key,
+        model,
+    })
+    .expect("failed to save config");
 
     println!(
         "\nSetup complete. please will use {} for AI features. Run `please commit` to try it out.",
@@ -73,7 +82,12 @@ fn add_or_update_provider() {
 fn change_model(saved: &[ProviderInfo]) {
     println!("\nChange the model for which provider?");
     for (i, info) in saved.iter().enumerate() {
-        println!("  {}) {} (currently: {})", i + 1, display_name(&info.provider), info.model.as_deref().unwrap_or("auto-selected"));
+        println!(
+            "  {}) {} (currently: {})",
+            i + 1,
+            display_name(&info.provider),
+            info.model.as_deref().unwrap_or("auto-selected")
+        );
     }
 
     let Some(choice) = pick(&prompt("Choose a number: "), saved.len()) else {
@@ -95,7 +109,10 @@ fn change_model(saved: &[ProviderInfo]) {
 /// developer type a specific model id instead, overriding the automated
 /// pick. `api_key` is only used for the auto-selection call.
 fn choose_model(provider: &str, api_key: &str) -> Option<String> {
-    println!("Selecting the lowest-cost model for {}...", display_name(provider));
+    println!(
+        "Selecting the lowest-cost model for {}...",
+        display_name(provider)
+    );
     let auto = llm::select_model(provider, api_key);
 
     if let Some(model) = &auto {
@@ -104,7 +121,10 @@ fn choose_model(provider: &str, api_key: &str) -> Option<String> {
             return auto;
         }
     } else {
-        println!("No auto-selection available for {}. You'll need to enter one.", display_name(provider));
+        println!(
+            "No auto-selection available for {}. You'll need to enter one.",
+            display_name(provider)
+        );
     }
 
     loop {
@@ -139,7 +159,10 @@ fn switch_active(saved: &[ProviderInfo]) {
 
     let provider = &inactive[choice].provider;
     match config::set_active(provider) {
-        Ok(()) => println!("Switched. please now uses {} for AI features.", display_name(provider)),
+        Ok(()) => println!(
+            "Switched. please now uses {} for AI features.",
+            display_name(provider)
+        ),
         Err(err) => eprintln!("Couldn't switch: {err}"),
     }
 }
@@ -156,7 +179,13 @@ fn remove_provider(saved: &[ProviderInfo]) {
     };
 
     let target = &saved[choice];
-    if !confirm(&format!("Remove the saved {} key? [y/N]: ", display_name(&target.provider)), false) {
+    if !confirm(
+        &format!(
+            "Remove the saved {} key? [y/N]: ",
+            display_name(&target.provider)
+        ),
+        false,
+    ) {
         println!("Cancelled.");
         return;
     }
@@ -183,7 +212,11 @@ fn remove_provider(saved: &[ProviderInfo]) {
 /// Parses a 1-based menu choice against `len` options; `None` on anything
 /// that doesn't land in range.
 fn pick(input: &str, len: usize) -> Option<usize> {
-    input.parse::<usize>().ok().filter(|n| (1..=len).contains(n)).map(|n| n - 1)
+    input
+        .parse::<usize>()
+        .ok()
+        .filter(|n| (1..=len).contains(n))
+        .map(|n| n - 1)
 }
 
 fn select_provider() -> String {
@@ -251,8 +284,19 @@ fn display_name(provider: &str) -> String {
 /// Shows just enough of a stored key to confirm "yes, that's the one I set"
 /// without ever displaying the whole secret.
 fn mask_key(key: &str) -> String {
-    let tail: String = key.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-    if key.len() <= 4 { "****".to_string() } else { format!("...{tail}") }
+    let tail: String = key
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    if key.len() <= 4 {
+        "****".to_string()
+    } else {
+        format!("...{tail}")
+    }
 }
 
 /// Prompts a yes/no question. `default_yes` decides what an empty answer

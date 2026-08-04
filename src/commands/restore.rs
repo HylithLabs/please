@@ -12,7 +12,10 @@ pub fn run(args: &[String]) {
     };
 
     match git::restore_file_from_commit(&commit, path) {
-        Ok(()) => println!("Restored '{path}' (as it was before commit {}).", &commit[..7]),
+        Ok(()) => println!(
+            "Restored '{path}' (as it was before commit {}).",
+            &commit[..7]
+        ),
         Err(err) => {
             eprintln!("Failed to restore '{path}': {err}");
             std::process::exit(1);

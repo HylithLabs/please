@@ -51,7 +51,10 @@ pub fn run() {
             let total = outcome.commits.len();
             for (index, group) in outcome.commits.into_iter().enumerate() {
                 if !git::stage_files(&group.files) {
-                    crate::ui::error(&format!("skipping commit, failed to stage {:?}", group.files));
+                    crate::ui::error(&format!(
+                        "skipping commit, failed to stage {:?}",
+                        group.files
+                    ));
                     continue;
                 }
 

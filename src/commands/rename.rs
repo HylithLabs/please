@@ -38,6 +38,8 @@ pub fn run(args: &[String]) {
 
     match git::delete_remote_branch(&old_name) {
         Ok(()) => println!("Removed old remote branch 'origin/{old_name}'."),
-        Err(err) => eprintln!("Pushed '{new_name}', but failed to remove old remote branch '{old_name}': {err}"),
+        Err(err) => eprintln!(
+            "Pushed '{new_name}', but failed to remove old remote branch '{old_name}': {err}"
+        ),
     }
 }

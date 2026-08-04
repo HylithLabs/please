@@ -51,17 +51,22 @@ fn read_store() -> Store {
     // Pre-multi-provider files have no "active=" line — just bare
     // provider=/api_key=/model= keys for the one provider that existed.
     // Migrate them into the new format transparently, once.
-    if !contents.lines().any(|line| line.starts_with("active=")) {
-        if let Some(legacy) = parse_legacy(&contents) {
-            let mut store = Store::default();
-            store.active = Some(legacy.provider.clone());
-            store.providers.insert(
-                legacy.provider,
-                ProviderEntry { api_key: Some(legacy.api_key), model: legacy.model },
-            );
-            let _ = write_store(&store);
-            return store;
-        }
+    if !contents.lines().any(|line| line.starts_with("active="))
+        && let Some(legacy) = parse_legacy(&contents)
+    {
+        let mut store = Store {
+            active: Some(legacy.provider.clone()),
+            ..Store::default()
+        };
+        store.providers.insert(
+            legacy.provider,
+            ProviderEntry {
+                api_key: Some(legacy.api_key),
+                model: legacy.model,
+            },
+        );
+        let _ = write_store(&store);
+        return store;
     }
 
     let mut store = Store::default();
@@ -70,8 +75,12 @@ fn read_store() -> Store {
             store.active = Some(value.to_string());
             continue;
         }
-        let Some((key, value)) = line.split_once('=') else { continue };
-        let Some((provider, field)) = key.split_once('.') else { continue };
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let Some((provider, field)) = key.split_once('.') else {
+            continue;
+        };
         let entry = store.providers.entry(provider.to_string()).or_default();
         match field {
             "api_key" => entry.api_key = Some(value.to_string()),
@@ -97,7 +106,11 @@ fn parse_legacy(contents: &str) -> Option<Config> {
         }
     }
 
-    Some(Config { provider: provider?, api_key: api_key?, model })
+    Some(Config {
+        provider: provider?,
+        api_key: api_key?,
+        model,
+    })
 }
 
 fn write_store(store: &Store) -> io::Result<()> {
@@ -109,7 +122,9 @@ fn write_store(store: &Store) -> io::Result<()> {
         contents.push_str(&format!("active={active}\n"));
     }
     for (provider, entry) in &store.providers {
-        let Some(api_key) = &entry.api_key else { continue };
+        let Some(api_key) = &entry.api_key else {
+            continue;
+        };
         contents.push_str(&format!("{provider}.api_key={api_key}\n"));
         if let Some(model) = &entry.model {
             contents.push_str(&format!("{provider}.model={model}\n"));
@@ -135,7 +150,11 @@ pub fn load() -> Option<Config> {
     let store = read_store();
     let active = store.active?;
     let entry = store.providers.get(&active)?;
-    Some(Config { provider: active, api_key: entry.api_key.clone()?, model: entry.model.clone() })
+    Some(Config {
+        provider: active,
+        api_key: entry.api_key.clone()?,
+        model: entry.model.clone(),
+    })
 }
 
 /// Saves (or updates) one provider's key and model, and makes it the
@@ -145,7 +164,10 @@ pub fn save(config: &Config) -> io::Result<()> {
     let mut store = read_store();
     store.providers.insert(
         config.provider.clone(),
-        ProviderEntry { api_key: Some(config.api_key.clone()), model: config.model.clone() },
+        ProviderEntry {
+            api_key: Some(config.api_key.clone()),
+            model: config.model.clone(),
+        },
     );
     store.active = Some(config.provider.clone());
     write_store(&store)
@@ -155,7 +177,10 @@ pub fn save(config: &Config) -> io::Result<()> {
 /// provider untouched. `None` clears it back to auto-selection.
 pub fn update_model(provider: &str, model: Option<String>) -> Result<(), String> {
     let mut store = read_store();
-    let entry = store.providers.get_mut(provider).filter(|entry| entry.api_key.is_some());
+    let entry = store
+        .providers
+        .get_mut(provider)
+        .filter(|entry| entry.api_key.is_some());
     let Some(entry) = entry else {
         return Err(format!("No saved key for '{provider}'."));
     };
@@ -175,7 +200,12 @@ pub fn list() -> Vec<ProviderInfo> {
         .filter_map(|(provider, entry)| {
             let api_key = entry.api_key?;
             let is_active = active.as_deref() == Some(provider.as_str());
-            Some(ProviderInfo { provider, api_key, model: entry.model, active: is_active })
+            Some(ProviderInfo {
+                provider,
+                api_key,
+                model: entry.model,
+                active: is_active,
+            })
         })
         .collect();
 
@@ -187,9 +217,14 @@ pub fn list() -> Vec<ProviderInfo> {
 /// without touching any stored key. Errors (unchanged) if it doesn't.
 pub fn set_active(provider: &str) -> Result<(), String> {
     let mut store = read_store();
-    let has_key = store.providers.get(provider).is_some_and(|entry| entry.api_key.is_some());
+    let has_key = store
+        .providers
+        .get(provider)
+        .is_some_and(|entry| entry.api_key.is_some());
     if !has_key {
-        return Err(format!("No saved key for '{provider}' yet — set one up first."));
+        return Err(format!(
+            "No saved key for '{provider}' yet — set one up first."
+        ));
     }
     store.active = Some(provider.to_string());
     write_store(&store).map_err(|e| e.to_string())

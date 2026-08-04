@@ -12,7 +12,11 @@ fn colors_enabled() -> bool {
 }
 
 fn paint(text: &str, code: &str) -> String {
-    if colors_enabled() { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_string() }
+    if colors_enabled() {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
 }
 
 fn bold(text: &str) -> String {

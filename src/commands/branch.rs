@@ -47,7 +47,9 @@ fn delete(args: &[String]) {
     }
 
     if git::current_branch() == *name {
-        eprintln!("Can't delete '{name}' — it's the branch you're on. Switch to another branch first.");
+        eprintln!(
+            "Can't delete '{name}' — it's the branch you're on. Switch to another branch first."
+        );
         std::process::exit(1);
     }
 

@@ -1,9 +1,12 @@
 use crate::commands;
 
-/// Every literal `please` subcommand, normalized to the same `fn(&[String])`
-/// shape so exact and fuzzy matching can treat them uniformly, regardless
-/// of whether the underlying command actually takes arguments.
-const COMMANDS: &[(&str, fn(&[String]))] = &[
+/// Shape every literal `please` subcommand is normalized to, so exact and
+/// fuzzy matching can treat them uniformly regardless of whether the
+/// underlying command actually takes arguments.
+type CommandFn = fn(&[String]);
+
+/// Every literal `please` subcommand, normalized to `CommandFn`.
+const COMMANDS: &[(&str, CommandFn)] = &[
     ("commit", |_| commands::commit::run()),
     ("push", |_| commands::push::run()),
     ("setup", |_| commands::setup::run()),
@@ -21,10 +24,12 @@ const COMMANDS: &[(&str, fn(&[String]))] = &[
     ("log", |_| commands::log::run()),
     ("revert", |_| commands::revert::run()),
     ("stash", commands::stash::run),
+    ("squash", commands::squash::run),
     ("purge", commands::purge::run),
     ("chat", |_| commands::chat::run()),
     ("alias", commands::alias::run),
     ("help", |_| commands::help::run()),
+    ("update", |_| commands::update::run()),
 ];
 
 /// Small words that show up in a casual sentence but were never meant as an
@@ -55,8 +60,11 @@ pub fn route(words: &[String]) {
     commands::agent::run(&words.join(" "));
 }
 
-fn exact_command(word: &str) -> Option<fn(&[String])> {
-    COMMANDS.iter().find(|(name, _)| name.eq_ignore_ascii_case(word)).map(|(_, run)| *run)
+fn exact_command(word: &str) -> Option<CommandFn> {
+    COMMANDS
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(word))
+        .map(|(_, run)| *run)
 }
 
 /// Matches a typo'd command word (single substitution, insertion, deletion,
@@ -64,11 +72,11 @@ fn exact_command(word: &str) -> Option<fn(&[String])> {
 /// than that risks hijacking a genuine sentence for the AI agent — "clean
 /// up my messy code" is two edits from "cleanup" and must NOT become
 /// `please cleanup`, so the threshold stays tight rather than generous.
-fn fuzzy_command(word: &str) -> Option<fn(&[String])> {
+fn fuzzy_command(word: &str) -> Option<CommandFn> {
     const MAX_DISTANCE: usize = 1;
     let word = word.to_lowercase();
 
-    let mut best: Option<(usize, fn(&[String]))> = None;
+    let mut best: Option<(usize, CommandFn)> = None;
     let mut ambiguous = false;
 
     for &(name, run) in COMMANDS {
@@ -87,11 +95,18 @@ fn fuzzy_command(word: &str) -> Option<fn(&[String])> {
         }
     }
 
-    if ambiguous { None } else { best.map(|(_, run)| run) }
+    if ambiguous {
+        None
+    } else {
+        best.map(|(_, run)| run)
+    }
 }
 
 fn strip_filler(args: &[String]) -> Vec<String> {
-    args.iter().filter(|word| !FILLER_WORDS.contains(&word.to_lowercase().as_str())).cloned().collect()
+    args.iter()
+        .filter(|word| !FILLER_WORDS.contains(&word.to_lowercase().as_str()))
+        .cloned()
+        .collect()
 }
 
 /// Optimal string alignment distance: substitutions, insertions, deletions,
@@ -106,14 +121,16 @@ fn edit_distance(a: &str, b: &str) -> usize {
     for (i, row) in d.iter_mut().enumerate().take(n + 1) {
         row[0] = i;
     }
-    for j in 0..=m {
-        d[0][j] = j;
+    for (j, cell) in d[0].iter_mut().enumerate() {
+        *cell = j;
     }
 
     for i in 1..=n {
         for j in 1..=m {
             let cost = usize::from(a[i - 1] != b[j - 1]);
-            let mut value = (d[i - 1][j] + 1).min(d[i][j - 1] + 1).min(d[i - 1][j - 1] + cost);
+            let mut value = (d[i - 1][j] + 1)
+                .min(d[i][j - 1] + 1)
+                .min(d[i - 1][j - 1] + cost);
             if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
                 value = value.min(d[i - 2][j - 2] + 1);
             }

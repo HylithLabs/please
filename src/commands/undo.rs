@@ -13,7 +13,9 @@ pub fn run() {
         Ok(()) => {
             git::record_undo(&commit);
             println!("Undone: {message}");
-            println!("Changes are back in your working tree — `please commit` to try again, or `please redo` to bring it back.");
+            println!(
+                "Changes are back in your working tree — `please commit` to try again, or `please redo` to bring it back."
+            );
         }
         Err(err) => {
             eprintln!("Failed to undo: {err}");

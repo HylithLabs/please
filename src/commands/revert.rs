@@ -56,7 +56,9 @@ pub fn run() {
                 for file in git::conflicted_files() {
                     eprintln!("  {file}");
                 }
-                eprintln!("Resolve them and run `please commit`, or run `please discard` to cancel the revert.");
+                eprintln!(
+                    "Resolve them and run `please commit`, or run `please discard` to cancel the revert."
+                );
             } else {
                 eprintln!("Failed to revert: {err}");
             }

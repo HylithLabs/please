@@ -17,7 +17,9 @@ pub fn run(args: &[String]) {
     }
 
     if git::has_pending_changes() {
-        eprintln!("You have uncommitted changes — commit or discard them first, then move the commit.");
+        eprintln!(
+            "You have uncommitted changes — commit or discard them first, then move the commit."
+        );
         std::process::exit(1);
     }
 
