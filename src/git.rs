@@ -81,3 +81,25 @@ pub fn has_pending_changes() -> bool {
         .map(|output| !output.stdout.is_empty())
         .unwrap_or(false)
 }
+
+pub fn current_branch() -> String {
+    let output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .expect("failed to run git rev-parse --abbrev-ref HEAD");
+
+    if !output.status.success() {
+        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        std::process::exit(1);
+    }
+
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+pub fn push(branch: &str) -> bool {
+    Command::new("git")
+        .args(["push", "origin", branch])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
