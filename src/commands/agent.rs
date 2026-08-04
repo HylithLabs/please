@@ -59,8 +59,8 @@ fn build_system_prompt(project_context: Option<&str>) -> String {
          diffs, GitHub PRs/issues, and the like.\n\n\
          A few please subcommands normally ask for interactive confirmation before doing \
          something destructive (please discard, please sync exactly, please revert, please \
-         stash drop, please purge, and please switch when the branch doesn't exist yet). Run \
-         through you, they can't be confirmed \
+         stash drop, please purge, please squash, and please switch when the branch doesn't \
+         exist yet). Run through you, they can't be confirmed \
          non-interactively, so they'll cancel themselves and say so — that's not a bug, don't \
          retry them. Tell the developer to run that command directly so they can confirm it \
          themselves. To create a new branch, use `please branch <name>` (creates and switches, \
@@ -112,7 +112,7 @@ fn tool_specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "run_please",
-            description: "Run a `please` subcommand: one of status, branch, switch, sync, undo, redo, move-commit, discard, restore, rename, cleanup, log, revert, stash, purge, commit, push. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, list/pop/drop for stash, or a path for purge).",
+            description: "Run a `please` subcommand: one of status, branch, switch, sync, undo, redo, move-commit, discard, restore, rename, cleanup, log, revert, stash, purge, squash, commit, push, update. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, list/pop/drop for stash, a path for purge, or a count/ref for squash).",
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -138,7 +138,12 @@ fn extract_args(value: &serde_json::Value) -> Vec<String> {
     value
         .get("args")
         .and_then(|v| v.as_array())
-        .map(|items| items.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -206,7 +211,10 @@ fn capture_output(command: &mut Command) -> String {
             text.to_string()
         }
     } else {
-        format!("Command failed (exit code {}): {text}", output.status.code().unwrap_or(-1))
+        format!(
+            "Command failed (exit code {}): {text}",
+            output.status.code().unwrap_or(-1)
+        )
     };
 
     if result.len() > MAX_TOOL_OUTPUT {
@@ -228,7 +236,9 @@ fn is_destructive(bin: &str, args: &[String]) -> bool {
             || (has("clean") && args.iter().any(|a| a.starts_with('-') && a.contains('f')))
             || (has("branch") && has("-D"))
             || (has("push") && has("--delete"))
-            || args.iter().any(|a| a == "filter-branch" || a == "filter-repo")
+            || args
+                .iter()
+                .any(|a| a == "filter-branch" || a == "filter-repo")
     } else {
         has("delete") || has("close")
     }
@@ -239,5 +249,6 @@ fn confirm_destructive(command_line: &str) -> bool {
     let _ = io::stderr().flush();
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).is_ok() && matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
+    io::stdin().read_line(&mut input).is_ok()
+        && matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
 }

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use super::{AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec};
+use super::{
+    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec,
+};
 
 const MESSAGES_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
 const MODELS_ENDPOINT: &str = "https://api.anthropic.com/v1/models";
@@ -37,7 +39,11 @@ struct WireBlock {
 
 impl WireBlock {
     fn text(text: impl Into<String>) -> Self {
-        Self { kind: "text".to_string(), text: Some(text.into()), ..Default::default() }
+        Self {
+            kind: "text".to_string(),
+            text: Some(text.into()),
+            ..Default::default()
+        }
     }
 }
 
@@ -107,6 +113,17 @@ pub fn describe_codebase(
     generate_with_retry("Analyzing codebase", &prompt, api_key, model, None)
 }
 
+pub fn squash_message(
+    commit_summaries: &str,
+    diff: &str,
+    context: Option<&str>,
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<GenerationOutcome, String> {
+    let prompt = super::build_squash_prompt(commit_summaries, diff, context);
+    generate_with_retry("Writing squash message", &prompt, api_key, model, None)
+}
+
 pub fn plan_commits(
     diff: &str,
     context: Option<&str>,
@@ -128,7 +145,10 @@ pub fn plan_commits(
         return Err("model returned an empty commit plan".to_string());
     }
 
-    Ok(CommitPlanOutcome { commits: plan.commits, model_used: outcome.model_used })
+    Ok(CommitPlanOutcome {
+        commits: plan.commits,
+        model_used: outcome.model_used,
+    })
 }
 
 #[derive(Deserialize)]
@@ -154,13 +174,21 @@ fn generate_with_retry(
     crate::ui::step(&format!("{label} (model: {current_model})"));
 
     match call_claude(prompt, api_key, &current_model, &format) {
-        Ok(message) => Ok(GenerationOutcome { message, model_used: current_model }),
+        Ok(message) => Ok(GenerationOutcome {
+            message,
+            model_used: current_model,
+        }),
         Err(err) => {
-            crate::ui::warn(&format!("model '{current_model}' failed ({err}). Re-selecting a model."));
+            crate::ui::warn(&format!(
+                "model '{current_model}' failed ({err}). Re-selecting a model."
+            ));
             current_model = select_lowest_cost_model(api_key);
             crate::ui::step(&format!("{label} (model: {current_model})"));
             let message = call_claude(prompt, api_key, &current_model, &format)?;
-            Ok(GenerationOutcome { message, model_used: current_model })
+            Ok(GenerationOutcome {
+                message,
+                model_used: current_model,
+            })
         }
     }
 }
@@ -175,10 +203,16 @@ fn call_claude(
         model,
         max_tokens: MAX_TOKENS,
         system: None,
-        messages: vec![WireMessage { role: "user".to_string(), content: vec![WireBlock::text(prompt)] }],
+        messages: vec![WireMessage {
+            role: "user".to_string(),
+            content: vec![WireBlock::text(prompt)],
+        }],
         tools: Vec::new(),
         output_config: format.as_ref().map(|format| OutputConfig {
-            format: OutputFormat { kind: format.kind, schema: format.schema.clone() },
+            format: OutputFormat {
+                kind: format.kind,
+                schema: format.schema.clone(),
+            },
         }),
     };
 
@@ -208,7 +242,10 @@ fn send(api_key: &str, request: &MessagesRequest) -> Result<MessagesResponse, St
         .send_json(request)
         .map_err(|e| format!("Claude request failed: {e}"))?;
 
-    response.body_mut().read_json().map_err(|e| format!("failed to parse Claude response: {e}"))
+    response
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("failed to parse Claude response: {e}"))
 }
 
 /// A cheap, side-effect-free way to confirm a key actually authenticates —
@@ -225,7 +262,9 @@ pub fn select_lowest_cost_model(api_key: &str) -> String {
     match fetch_models(api_key) {
         Ok(models) => pick_lowest_cost_model(models).unwrap_or_else(|| FALLBACK_MODEL.to_string()),
         Err(err) => {
-            crate::ui::warn(&format!("model auto-detection failed ({err}). Using fallback model."));
+            crate::ui::warn(&format!(
+                "model auto-detection failed ({err}). Using fallback model."
+            ));
             FALLBACK_MODEL.to_string()
         }
     }
@@ -241,20 +280,30 @@ fn fetch_models(api_key: &str) -> Result<Vec<ModelInfo>, String> {
         .call()
         .map_err(|e| format!("failed to list models: {e}"))?;
 
-    let parsed: ModelsListResponse =
-        response.body_mut().read_json().map_err(|e| format!("failed to parse model list: {e}"))?;
+    let parsed: ModelsListResponse = response
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("failed to parse model list: {e}"))?;
 
     Ok(parsed.data)
 }
 
 fn pick_lowest_cost_model(models: Vec<ModelInfo>) -> Option<String> {
-    let mut haiku: Vec<String> = models.iter().filter(|m| m.id.contains("haiku")).map(|m| m.id.clone()).collect();
+    let mut haiku: Vec<String> = models
+        .iter()
+        .filter(|m| m.id.contains("haiku"))
+        .map(|m| m.id.clone())
+        .collect();
     haiku.sort();
     if let Some(best) = haiku.pop() {
         return Some(best);
     }
 
-    let mut sonnet: Vec<String> = models.into_iter().filter(|m| m.id.contains("sonnet")).map(|m| m.id).collect();
+    let mut sonnet: Vec<String> = models
+        .into_iter()
+        .filter(|m| m.id.contains("sonnet"))
+        .map(|m| m.id)
+        .collect();
     sonnet.sort();
     sonnet.pop()
 }
@@ -265,11 +314,15 @@ fn to_wire_history(history: &[AgentMessage]) -> Vec<WireMessage> {
     history
         .iter()
         .map(|message| match message {
-            AgentMessage::User(text) => {
-                WireMessage { role: "user".to_string(), content: vec![WireBlock::text(text.clone())] }
-            }
+            AgentMessage::User(text) => WireMessage {
+                role: "user".to_string(),
+                content: vec![WireBlock::text(text.clone())],
+            },
             AgentMessage::Model { calls, text } => {
-                let mut content: Vec<WireBlock> = text.iter().map(|text| WireBlock::text(text.clone())).collect();
+                let mut content: Vec<WireBlock> = text
+                    .iter()
+                    .map(|text| WireBlock::text(text.clone()))
+                    .collect();
                 content.extend(calls.iter().map(|call| WireBlock {
                     kind: "tool_use".to_string(),
                     id: Some(call.id.clone()),
@@ -277,7 +330,10 @@ fn to_wire_history(history: &[AgentMessage]) -> Vec<WireMessage> {
                     input: Some(call.args.clone()),
                     ..Default::default()
                 }));
-                WireMessage { role: "assistant".to_string(), content }
+                WireMessage {
+                    role: "assistant".to_string(),
+                    content,
+                }
             }
             AgentMessage::ToolResults(outcomes) => WireMessage {
                 role: "user".to_string(),
@@ -305,7 +361,9 @@ pub fn agent_turn(
     api_key: &str,
     model: Option<&str>,
 ) -> Result<AgentTurn, String> {
-    let model = model.map(str::to_string).unwrap_or_else(|| select_lowest_cost_model(api_key));
+    let model = model
+        .map(str::to_string)
+        .unwrap_or_else(|| select_lowest_cost_model(api_key));
 
     let request = MessagesRequest {
         model: &model,
@@ -314,7 +372,11 @@ pub fn agent_turn(
         messages: to_wire_history(history),
         tools: tools
             .iter()
-            .map(|tool| WireTool { name: tool.name, description: tool.description, input_schema: tool.parameters.clone() })
+            .map(|tool| WireTool {
+                name: tool.name,
+                description: tool.description,
+                input_schema: tool.parameters.clone(),
+            })
             .collect(),
         output_config: None,
     };
@@ -351,7 +413,9 @@ pub fn agent_turn(
         Ok(AgentTurn::Final(text_parts.join("\n").trim().to_string()))
     } else {
         let text = (!text_parts.is_empty()).then(|| text_parts.join("\n").trim().to_string());
-        Ok(AgentTurn::ToolCalls { calls: tool_calls, text })
+        Ok(AgentTurn::ToolCalls {
+            calls: tool_calls,
+            text,
+        })
     }
 }
-

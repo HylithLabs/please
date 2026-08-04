@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use super::{AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec};
+use super::{
+    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec,
+};
 
 const CHAT_ENDPOINT: &str = "https://api.openai.com/v1/chat/completions";
 const MODELS_ENDPOINT: &str = "https://api.openai.com/v1/models";
@@ -23,7 +25,12 @@ struct WireMessage {
 
 impl WireMessage {
     fn user(text: impl Into<String>) -> Self {
-        Self { role: "user".to_string(), content: Some(text.into()), tool_calls: None, tool_call_id: None }
+        Self {
+            role: "user".to_string(),
+            content: Some(text.into()),
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
 }
 
@@ -118,6 +125,17 @@ pub fn describe_codebase(
     generate_with_retry("Analyzing codebase", &prompt, api_key, model, None)
 }
 
+pub fn squash_message(
+    commit_summaries: &str,
+    diff: &str,
+    context: Option<&str>,
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<GenerationOutcome, String> {
+    let prompt = super::build_squash_prompt(commit_summaries, diff, context);
+    generate_with_retry("Writing squash message", &prompt, api_key, model, None)
+}
+
 pub fn plan_commits(
     diff: &str,
     context: Option<&str>,
@@ -143,7 +161,10 @@ pub fn plan_commits(
         return Err("model returned an empty commit plan".to_string());
     }
 
-    Ok(CommitPlanOutcome { commits: plan.commits, model_used: outcome.model_used })
+    Ok(CommitPlanOutcome {
+        commits: plan.commits,
+        model_used: outcome.model_used,
+    })
 }
 
 #[derive(Deserialize)]
@@ -169,13 +190,21 @@ fn generate_with_retry(
     crate::ui::step(&format!("{label} (model: {current_model})"));
 
     match call_chatgpt(prompt, api_key, &current_model, &format) {
-        Ok(message) => Ok(GenerationOutcome { message, model_used: current_model }),
+        Ok(message) => Ok(GenerationOutcome {
+            message,
+            model_used: current_model,
+        }),
         Err(err) => {
-            crate::ui::warn(&format!("model '{current_model}' failed ({err}). Re-selecting a model."));
+            crate::ui::warn(&format!(
+                "model '{current_model}' failed ({err}). Re-selecting a model."
+            ));
             current_model = select_lowest_cost_model(api_key);
             crate::ui::step(&format!("{label} (model: {current_model})"));
             let message = call_chatgpt(prompt, api_key, &current_model, &format)?;
-            Ok(GenerationOutcome { message, model_used: current_model })
+            Ok(GenerationOutcome {
+                message,
+                model_used: current_model,
+            })
         }
     }
 }
@@ -221,7 +250,10 @@ fn send(api_key: &str, request: &ChatRequest) -> Result<ChatResponse, String> {
         .send_json(request)
         .map_err(|e| format!("ChatGPT request failed: {e}"))?;
 
-    response.body_mut().read_json().map_err(|e| format!("failed to parse ChatGPT response: {e}"))
+    response
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("failed to parse ChatGPT response: {e}"))
 }
 
 /// A cheap, side-effect-free way to confirm a key actually authenticates —
@@ -239,7 +271,9 @@ pub fn select_lowest_cost_model(api_key: &str) -> String {
     match fetch_models(api_key) {
         Ok(models) => pick_lowest_cost_model(models).unwrap_or_else(|| FALLBACK_MODEL.to_string()),
         Err(err) => {
-            crate::ui::warn(&format!("model auto-detection failed ({err}). Using fallback model."));
+            crate::ui::warn(&format!(
+                "model auto-detection failed ({err}). Using fallback model."
+            ));
             FALLBACK_MODEL.to_string()
         }
     }
@@ -254,27 +288,44 @@ fn fetch_models(api_key: &str) -> Result<Vec<ModelInfo>, String> {
         .call()
         .map_err(|e| format!("failed to list models: {e}"))?;
 
-    let parsed: ModelsListResponse =
-        response.body_mut().read_json().map_err(|e| format!("failed to parse model list: {e}"))?;
+    let parsed: ModelsListResponse = response
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("failed to parse model list: {e}"))?;
 
     Ok(parsed.data)
 }
 
-const NON_CHAT_MARKERS: [&str; 9] =
-    ["embedding", "whisper", "tts", "dall-e", "moderation", "davinci", "babbage", "audio", "realtime"];
+const NON_CHAT_MARKERS: [&str; 9] = [
+    "embedding",
+    "whisper",
+    "tts",
+    "dall-e",
+    "moderation",
+    "davinci",
+    "babbage",
+    "audio",
+    "realtime",
+];
 
 fn pick_lowest_cost_model(models: Vec<ModelInfo>) -> Option<String> {
     let chat_capable = |id: &str| !NON_CHAT_MARKERS.iter().any(|marker| id.contains(marker));
 
-    let mut nano: Vec<String> =
-        models.iter().filter(|m| chat_capable(&m.id) && m.id.contains("nano")).map(|m| m.id.clone()).collect();
+    let mut nano: Vec<String> = models
+        .iter()
+        .filter(|m| chat_capable(&m.id) && m.id.contains("nano"))
+        .map(|m| m.id.clone())
+        .collect();
     nano.sort();
     if let Some(best) = nano.pop() {
         return Some(best);
     }
 
-    let mut mini: Vec<String> =
-        models.into_iter().filter(|m| chat_capable(&m.id) && m.id.contains("mini")).map(|m| m.id).collect();
+    let mut mini: Vec<String> = models
+        .into_iter()
+        .filter(|m| chat_capable(&m.id) && m.id.contains("mini"))
+        .map(|m| m.id)
+        .collect();
     mini.sort();
     mini.pop()
 }
@@ -331,7 +382,9 @@ pub fn agent_turn(
     api_key: &str,
     model: Option<&str>,
 ) -> Result<AgentTurn, String> {
-    let model = model.map(str::to_string).unwrap_or_else(|| select_lowest_cost_model(api_key));
+    let model = model
+        .map(str::to_string)
+        .unwrap_or_else(|| select_lowest_cost_model(api_key));
 
     let mut messages = vec![WireMessage {
         role: "system".to_string(),
@@ -373,16 +426,24 @@ pub fn agent_turn(
         .map(|call| ToolCall {
             id: call.id,
             name: call.function.name,
-            args: serde_json::from_str(&call.function.arguments).unwrap_or_else(|_| serde_json::json!({})),
+            args: serde_json::from_str(&call.function.arguments)
+                .unwrap_or_else(|_| serde_json::json!({})),
             thought_signature: None,
         })
         .collect();
 
     if tool_calls.is_empty() {
-        Ok(AgentTurn::Final(message.content.unwrap_or_default().trim().to_string()))
+        Ok(AgentTurn::Final(
+            message.content.unwrap_or_default().trim().to_string(),
+        ))
     } else {
-        let text = message.content.map(|text| text.trim().to_string()).filter(|text| !text.is_empty());
-        Ok(AgentTurn::ToolCalls { calls: tool_calls, text })
+        let text = message
+            .content
+            .map(|text| text.trim().to_string())
+            .filter(|text| !text.is_empty());
+        Ok(AgentTurn::ToolCalls {
+            calls: tool_calls,
+            text,
+        })
     }
 }
-

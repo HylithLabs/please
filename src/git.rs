@@ -245,7 +245,12 @@ pub fn upstream_branch() -> Option<String> {
 /// (commits ahead, commits behind) HEAD is relative to `upstream`.
 pub fn ahead_behind(upstream: &str) -> Option<(usize, usize)> {
     let output = Command::new("git")
-        .args(["rev-list", "--left-right", "--count", &format!("HEAD...{upstream}")])
+        .args([
+            "rev-list",
+            "--left-right",
+            "--count",
+            &format!("HEAD...{upstream}"),
+        ])
         .output()
         .ok()?;
 
@@ -279,7 +284,12 @@ pub fn list_branches() -> Vec<(String, bool)> {
 
 pub fn branch_exists(name: &str) -> bool {
     Command::new("git")
-        .args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{name}")])
+        .args([
+            "show-ref",
+            "--verify",
+            "--quiet",
+            &format!("refs/heads/{name}"),
+        ])
         .status()
         .map(|status| status.success())
         .unwrap_or(false)
@@ -431,7 +441,12 @@ pub fn delete_local_branch(name: &str) -> Result<(), String> {
 
 pub fn has_remote_branch(name: &str) -> bool {
     Command::new("git")
-        .args(["show-ref", "--verify", "--quiet", &format!("refs/remotes/origin/{name}")])
+        .args([
+            "show-ref",
+            "--verify",
+            "--quiet",
+            &format!("refs/remotes/origin/{name}"),
+        ])
         .status()
         .map(|status| status.success())
         .unwrap_or(false)
@@ -453,12 +468,12 @@ pub fn default_branch() -> String {
         .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
         .output();
 
-    if let Ok(output) = output {
-        if output.status.success() {
-            let full = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if let Some(name) = full.strip_prefix("refs/remotes/origin/") {
-                return name.to_string();
-            }
+    if let Ok(output) = output
+        && output.status.success()
+    {
+        let full = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if let Some(name) = full.strip_prefix("refs/remotes/origin/") {
+            return name.to_string();
         }
     }
 
@@ -501,7 +516,12 @@ pub fn recent_commits(count: usize) -> Vec<(String, String)> {
 /// or `None` if it doesn't name a real commit.
 pub fn resolve_commit(reference: &str) -> Option<String> {
     let output = Command::new("git")
-        .args(["rev-parse", "--verify", "--quiet", &format!("{reference}^{{commit}}")])
+        .args([
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("{reference}^{{commit}}"),
+        ])
         .output()
         .ok()?;
 
@@ -555,7 +575,10 @@ pub fn stash_list() -> Vec<String> {
         .output()
         .expect("failed to run git stash list");
 
-    String::from_utf8_lossy(&output.stdout).lines().map(str::to_string).collect()
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::to_string)
+        .collect()
 }
 
 /// True if `git filter-repo` (git's own recommended replacement for the
@@ -614,7 +637,10 @@ pub fn cleanup_after_filter_branch() -> Result<(), String> {
 }
 
 pub fn remote_url(name: &str) -> Option<String> {
-    let output = Command::new("git").args(["remote", "get-url", name]).output().ok()?;
+    let output = Command::new("git")
+        .args(["remote", "get-url", name])
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -638,6 +664,44 @@ pub fn path_ever_tracked(path: &str) -> bool {
         .args(["log", "--all", "--oneline", "--", path])
         .output()
         .map(|output| !output.stdout.is_empty())
+        .unwrap_or(false)
+}
+
+/// True if `ancestor` is actually in `descendant`'s history — squashing back
+/// to a commit that isn't would silently jump the branch pointer somewhere
+/// unrelated instead of just combining commits.
+pub fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
+    Command::new("git")
+        .args(["merge-base", "--is-ancestor", ancestor, descendant])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+/// Subjects of every commit strictly after `base` up to HEAD, oldest first —
+/// the commits a squash is about to combine, given as context to the model
+/// writing the combined message.
+pub fn commit_subjects_since(base: &str) -> Vec<String> {
+    let output = Command::new("git")
+        .args(["log", "--reverse", "--pretty=%s", &format!("{base}..HEAD")])
+        .output()
+        .expect("failed to run git log");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+/// Force-pushes just `branch`, with `--force-with-lease` rather than a plain
+/// `--force` — it fails instead of clobbering if someone else pushed to the
+/// branch since we last saw it, unlike `force_push_all`'s full-history reset
+/// where a plain force is already the deliberate, full-scope intent.
+pub fn force_push_with_lease(branch: &str) -> bool {
+    Command::new("git")
+        .args(["push", "--force-with-lease", "origin", branch])
+        .status()
+        .map(|status| status.success())
         .unwrap_or(false)
 }
 

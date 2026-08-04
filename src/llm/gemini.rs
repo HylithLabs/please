@@ -68,7 +68,9 @@ struct ModelInfo {
     supported_generation_methods: Vec<String>,
 }
 
-use super::{AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec};
+use super::{
+    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec,
+};
 
 pub fn describe_codebase(
     file_list: &str,
@@ -77,6 +79,17 @@ pub fn describe_codebase(
 ) -> Result<GenerationOutcome, String> {
     let prompt = super::build_description_prompt(file_list);
     generate_with_retry("Analyzing codebase", &prompt, api_key, model, None)
+}
+
+pub fn squash_message(
+    commit_summaries: &str,
+    diff: &str,
+    context: Option<&str>,
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<GenerationOutcome, String> {
+    let prompt = super::build_squash_prompt(commit_summaries, diff, context);
+    generate_with_retry("Writing squash message", &prompt, api_key, model, None)
 }
 
 /// Lets the model decide how to split the working tree's changes into one or
@@ -142,7 +155,9 @@ fn generate_with_retry(
             model_used: current_model,
         }),
         Err(err) => {
-            crate::ui::warn(&format!("model '{current_model}' failed ({err}). Re-selecting a model."));
+            crate::ui::warn(&format!(
+                "model '{current_model}' failed ({err}). Re-selecting a model."
+            ));
             current_model = select_lowest_cost_model(api_key);
             crate::ui::step(&format!("{label} (model: {current_model})"));
             let message = call_gemini(prompt, api_key, &current_model, generation_config)?;
@@ -206,7 +221,9 @@ pub fn select_lowest_cost_model(api_key: &str) -> String {
     match fetch_models(api_key) {
         Ok(models) => pick_lowest_cost_model(models).unwrap_or_else(|| FALLBACK_MODEL.to_string()),
         Err(err) => {
-            crate::ui::warn(&format!("model auto-detection failed ({err}). Using fallback model."));
+            crate::ui::warn(&format!(
+                "model auto-detection failed ({err}). Using fallback model."
+            ));
             FALLBACK_MODEL.to_string()
         }
     }
@@ -396,7 +413,10 @@ fn to_wire_history(history: &[AgentMessage]) -> Vec<WireContent> {
                     ..Default::default()
                 }));
 
-                WireContent { role: "model".to_string(), parts }
+                WireContent {
+                    role: "model".to_string(),
+                    parts,
+                }
             }
             // Gemini doesn't accept a "function" role for tool results — the
             // response turn is sent back as "user", same as a normal reply.
@@ -496,6 +516,9 @@ pub fn agent_turn(
         Ok(AgentTurn::Final(text_parts.join("\n").trim().to_string()))
     } else {
         let text = (!text_parts.is_empty()).then(|| text_parts.join("\n").trim().to_string());
-        Ok(AgentTurn::ToolCalls { calls: tool_calls, text })
+        Ok(AgentTurn::ToolCalls {
+            calls: tool_calls,
+            text,
+        })
     }
 }

@@ -48,14 +48,20 @@ enum AgentMessage {
     User(String),
     /// A model turn: zero or more tool calls, plus any text it said
     /// alongside them (a plain final answer is `calls: vec![]`).
-    Model { calls: Vec<ToolCall>, text: Option<String> },
+    Model {
+        calls: Vec<ToolCall>,
+        text: Option<String>,
+    },
     ToolResults(Vec<ToolOutcome>),
 }
 
 /// What a provider adapter produced for one turn: either more work to do, or
 /// a finished answer for the developer.
 enum AgentTurn {
-    ToolCalls { calls: Vec<ToolCall>, text: Option<String> },
+    ToolCalls {
+        calls: Vec<ToolCall>,
+        text: Option<String>,
+    },
     Final(String),
 }
 
@@ -69,7 +75,9 @@ pub struct AgentSession {
 
 impl AgentSession {
     pub fn new() -> Self {
-        Self { history: Vec::new() }
+        Self {
+            history: Vec::new(),
+        }
     }
 
     /// Sends `prompt` as the next user turn, runs however many tool-call
@@ -99,8 +107,15 @@ impl AgentSession {
         for turn in 1..=MAX_TURNS {
             let (calls, text) = match agent_turn(system_prompt, &working, tools, config)? {
                 AgentTurn::Final(text) => {
-                    let text = if text.is_empty() { "Done.".to_string() } else { text };
-                    working.push(AgentMessage::Model { calls: Vec::new(), text: Some(text.clone()) });
+                    let text = if text.is_empty() {
+                        "Done.".to_string()
+                    } else {
+                        text
+                    };
+                    working.push(AgentMessage::Model {
+                        calls: Vec::new(),
+                        text: Some(text.clone()),
+                    });
                     self.history = working;
                     return Ok(text);
                 }
@@ -111,7 +126,10 @@ impl AgentSession {
                 let text = "Stopped after several steps without finishing — try breaking the \
                              request into smaller pieces."
                     .to_string();
-                working.push(AgentMessage::Model { calls: Vec::new(), text: Some(text.clone()) });
+                working.push(AgentMessage::Model {
+                    calls: Vec::new(),
+                    text: Some(text.clone()),
+                });
                 self.history = working;
                 return Ok(text);
             }
@@ -162,9 +180,27 @@ fn agent_turn(
     config: &Config,
 ) -> Result<AgentTurn, String> {
     match config.provider.as_str() {
-        "google" => gemini::agent_turn(system_prompt, history, tools, &config.api_key, config.model.as_deref()),
-        "anthropic" => anthropic::agent_turn(system_prompt, history, tools, &config.api_key, config.model.as_deref()),
-        "openai" => openai::agent_turn(system_prompt, history, tools, &config.api_key, config.model.as_deref()),
+        "google" => gemini::agent_turn(
+            system_prompt,
+            history,
+            tools,
+            &config.api_key,
+            config.model.as_deref(),
+        ),
+        "anthropic" => anthropic::agent_turn(
+            system_prompt,
+            history,
+            tools,
+            &config.api_key,
+            config.model.as_deref(),
+        ),
+        "openai" => openai::agent_turn(
+            system_prompt,
+            history,
+            tools,
+            &config.api_key,
+            config.model.as_deref(),
+        ),
         other => Err(format!(
             "Provider '{other}' is not supported yet. 'google' (Gemini), 'anthropic' (Claude), \
              and 'openai' (ChatGPT) are wired up so far."
@@ -225,7 +261,10 @@ fn require_closed_objects(schema: &serde_json::Value) -> serde_json::Value {
             if map.get("type").and_then(|t| t.as_str()) == Some("object")
                 && !out.contains_key("additionalProperties")
             {
-                out.insert("additionalProperties".to_string(), serde_json::Value::Bool(false));
+                out.insert(
+                    "additionalProperties".to_string(),
+                    serde_json::Value::Bool(false),
+                );
             }
             serde_json::Value::Object(out)
         }
@@ -263,6 +302,33 @@ fn build_commit_plan_prompt(diff: &str, context: Option<&str>) -> String {
     prompt
 }
 
+/// Lets the model write a single combined commit message for a squash: the
+/// original commits' subjects give it the intent behind each change, the
+/// combined diff gives it the actual result.
+fn build_squash_prompt(commit_summaries: &str, diff: &str, context: Option<&str>) -> String {
+    let mut prompt = String::new();
+
+    if let Some(context) = context {
+        prompt.push_str("Project context:\n");
+        prompt.push_str(context);
+        prompt.push_str("\n\n");
+    }
+
+    prompt.push_str(
+        "You are an autonomous git agent. The developer is squashing a run of commits into a \
+         single commit before merging. Below are the original commits' messages, oldest first, \
+         for context on intent, followed by the full combined diff of everything they changed \
+         together. Write one concise, conventional-commit style message that summarizes the \
+         combined change as a single coherent unit of work. Output only the commit message \
+         itself, with no markdown formatting, no headings, and no explanation.\n\n",
+    );
+    prompt.push_str("Original commits:\n");
+    prompt.push_str(commit_summaries);
+    prompt.push_str("\n\nCombined diff:\n");
+    prompt.push_str(diff);
+    prompt
+}
+
 fn build_description_prompt(file_list: &str) -> String {
     format!(
         "You are analyzing a software repository. Based on the list of tracked files below, \
@@ -276,8 +342,45 @@ fn build_description_prompt(file_list: &str) -> String {
 pub fn describe_codebase(file_list: &str, config: &Config) -> Result<GenerationOutcome, String> {
     match config.provider.as_str() {
         "google" => gemini::describe_codebase(file_list, &config.api_key, config.model.as_deref()),
-        "anthropic" => anthropic::describe_codebase(file_list, &config.api_key, config.model.as_deref()),
+        "anthropic" => {
+            anthropic::describe_codebase(file_list, &config.api_key, config.model.as_deref())
+        }
         "openai" => openai::describe_codebase(file_list, &config.api_key, config.model.as_deref()),
+        other => Err(format!(
+            "Provider '{other}' is not supported yet. 'google' (Gemini), 'anthropic' (Claude), \
+             and 'openai' (ChatGPT) are wired up so far."
+        )),
+    }
+}
+
+pub fn squash_message(
+    commit_summaries: &str,
+    diff: &str,
+    context: Option<&str>,
+    config: &Config,
+) -> Result<GenerationOutcome, String> {
+    match config.provider.as_str() {
+        "google" => gemini::squash_message(
+            commit_summaries,
+            diff,
+            context,
+            &config.api_key,
+            config.model.as_deref(),
+        ),
+        "anthropic" => anthropic::squash_message(
+            commit_summaries,
+            diff,
+            context,
+            &config.api_key,
+            config.model.as_deref(),
+        ),
+        "openai" => openai::squash_message(
+            commit_summaries,
+            diff,
+            context,
+            &config.api_key,
+            config.model.as_deref(),
+        ),
         other => Err(format!(
             "Provider '{other}' is not supported yet. 'google' (Gemini), 'anthropic' (Claude), \
              and 'openai' (ChatGPT) are wired up so far."
@@ -292,7 +395,9 @@ pub fn plan_commits(
 ) -> Result<CommitPlanOutcome, String> {
     match config.provider.as_str() {
         "google" => gemini::plan_commits(diff, context, &config.api_key, config.model.as_deref()),
-        "anthropic" => anthropic::plan_commits(diff, context, &config.api_key, config.model.as_deref()),
+        "anthropic" => {
+            anthropic::plan_commits(diff, context, &config.api_key, config.model.as_deref())
+        }
         "openai" => openai::plan_commits(diff, context, &config.api_key, config.model.as_deref()),
         other => Err(format!(
             "Provider '{other}' is not supported yet. 'google' (Gemini), 'anthropic' (Claude), \
