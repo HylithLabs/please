@@ -4,6 +4,7 @@ mod commands;
 mod config;
 mod context;
 mod git;
+mod gitignore;
 mod llm;
 mod sensitive;
 

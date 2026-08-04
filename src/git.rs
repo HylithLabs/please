@@ -100,6 +100,22 @@ pub fn has_pending_changes() -> bool {
         .unwrap_or(false)
 }
 
+pub fn is_tracked(path: &str) -> bool {
+    Command::new("git")
+        .args(["ls-files", "--", path])
+        .output()
+        .map(|output| !output.stdout.is_empty())
+        .unwrap_or(false)
+}
+
+pub fn is_ignored(path: &str) -> bool {
+    Command::new("git")
+        .args(["check-ignore", "-q", path])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
 pub fn current_branch() -> String {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])

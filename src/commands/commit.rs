@@ -1,10 +1,13 @@
 use crate::config;
 use crate::context;
 use crate::git;
+use crate::gitignore;
 use crate::llm;
 use crate::sensitive;
 
 pub fn run() {
+    gitignore::ensure_junk_ignored();
+
     let already_staged = git::staged_files();
     git::stage_all();
 
