@@ -73,9 +73,7 @@ pub fn run_internal_check() {
             .header("User-Agent", "please-cli")
             .call()
     {
-        use std::io::Read;
-        let mut body_str = String::new();
-        if response.body_mut().read_to_string(&mut body_str).is_ok() {
+        if let Ok(body_str) = response.body_mut().read_to_string() {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
                 if let Some(tag) = json.get("tag_name").and_then(|s| s.as_str()) {
                     let version = tag.trim_start_matches('v');
