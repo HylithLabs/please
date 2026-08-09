@@ -27,22 +27,21 @@ pub fn check_and_notify() {
 
     // Check if we should notify
     if let Some(latest) = &cache.latest_version {
-        if Some(latest) != cache.ignored_version.as_ref() {
-            let current = env!("CARGO_PKG_VERSION");
-            if is_newer(latest, current) {
-                println!(
-                    "\n✨ A new version of please is available (v{})! Run 'please update' to install, or 'please update ignore' to hide.",
-                    latest
-                );
-            }
+        if Some(latest) != cache.ignored_version.as_ref()
+            && is_newer(latest, env!("CARGO_PKG_VERSION"))
+        {
+            println!(
+                "\n✨ A new version of please is available (v{})! Run 'please update' to install, or 'please update ignore' to hide.",
+                latest
+            );
         }
     }
 
     // Update the cache silently in background if older than 24h
-    if now > cache.last_checked_timestamp + 24 * 60 * 60 {
-        if let Ok(exe) = std::env::current_exe() {
-            let _ = Command::new(exe).arg("--internal-update-check").spawn();
-        }
+    if now > cache.last_checked_timestamp + 24 * 60 * 60
+        && let Ok(exe) = std::env::current_exe()
+    {
+        let _ = Command::new(exe).arg("--internal-update-check").spawn();
     }
 }
 
@@ -72,27 +71,24 @@ pub fn run_internal_check() {
         ureq::get("https://api.github.com/repos/HylithLabs/please/releases/latest")
             .header("User-Agent", "please-cli")
             .call()
+        && let Ok(body_str) = response.body_mut().read_to_string()
+        && let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str)
+        && let Some(tag) = json.get("tag_name").and_then(|s| s.as_str())
     {
-        if let Ok(body_str) = response.body_mut().read_to_string() {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
-                if let Some(tag) = json.get("tag_name").and_then(|s| s.as_str()) {
-                    let version = tag.trim_start_matches('v');
-                    let now = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
-                    let cache = UpdateCache {
-                        last_checked_timestamp: now,
-                        latest_version: Some(version.to_string()),
-                        ignored_version: None,
-                    };
-                    let _ = fs::create_dir_all(crate::config::config_dir());
-                    let _ = fs::write(
-                        cache_path(),
-                        serde_json::to_string(&cache).unwrap_or_default(),
-                    );
-                }
-            }
-        }
+        let version = tag.trim_start_matches('v');
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let cache = UpdateCache {
+            last_checked_timestamp: now,
+            latest_version: Some(version.to_string()),
+            ignored_version: None,
+        };
+        let _ = fs::create_dir_all(crate::config::config_dir());
+        let _ = fs::write(
+            cache_path(),
+            serde_json::to_string(&cache).unwrap_or_default(),
+        );
     }
 }

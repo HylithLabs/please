@@ -36,15 +36,12 @@ pub fn run(args: &[String]) {
             ))
             .header("User-Agent", "please-cli")
             .call()
+                && let Ok(body_str) = response.body_mut().read_to_string()
+                && let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str)
+                && let Some(body) = json.get("body").and_then(|s| s.as_str())
             {
-                if let Ok(body_str) = response.body_mut().read_to_string() {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
-                        if let Some(body) = json.get("body").and_then(|s| s.as_str()) {
-                            println!("\n🚀 What's New:\n");
-                            ui::print_markdown(body);
-                        }
-                    }
-                }
+                println!("\n🚀 What's New:\n");
+                ui::print_markdown(body);
             }
         }
         Ok(None) => ui::success("already up to date"),
