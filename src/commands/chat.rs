@@ -1,5 +1,5 @@
-use std::io::{self, Write};
 use owo_colors::OwoColorize;
+use std::io::{self, Write};
 
 use crate::commands::agent;
 use crate::llm;
