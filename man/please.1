@@ -1,67 +1,155 @@
-.TH PLEASE 1 "August 2026" "Please" "User Manuals"
+.TH PLEASE 1 "August 2026" "Please CLI" "Developer Manual"
+
+.\" --- MACROS FOR EXAMPLES ---
+.de EX
+.nf
+.ft CW
+..
+.de EE
+.ft R
+.fi
+..
+
 .SH NAME
-please \- An AI-native git CLI. You never type raw git commands.
+\fBplease\fR \- An AI-native git CLI. You never type raw git commands.
+
 .SH SYNOPSIS
 .B please
-.RI "<command> [args...]"
+.RI "<command> " [ args... ]
 .br
 .B please
 .RI """<what you want to do>"""
+
 .SH DESCRIPTION
-.B please
-is an AI-native git CLI. Git remains the engine underneath;
-.B please
-is the interface. It uses an AI agent (Anthropic Claude, Google Gemini, or OpenAI ChatGPT) to handle staging, commit messages, and pushing on your behalf.
+Welcome to the future of version control.
 .PP
-Typos and filler words don't block a command either. A typo'd command word is recognized if it's one edit away from a real command.
+\fBplease\fR is an AI-native interface to Git. Git remains the robust engine underneath, but \fBplease\fR takes over the steering wheel. Instead of wrestling with arcane flags, detached heads, and forgotten commit messages, you simply tell the CLI what you want.
+.PP
+Powered by Anthropic Claude, Google Gemini, or OpenAI ChatGPT, it handles the tedious parts—staging, summarizing diffs, and formatting commits—while leaving the heavy lifting to Git.
+.PP
+\fBDev-Friendly Features:\fR
+.IP \[bu] 2
+\fBFuzzy Matching:\fR Typoed `swich` or `brnach`? \fBplease\fR fixes it on the fly. No more "command not found".
+.IP \[bu]
+\fBZero-Jargon Status:\fR `please status` tells you exactly what's going on in plain English.
+.IP \[bu]
+\fBAuto-Guardrails:\fR Prevents accidentally committing secrets (`.env`) or massive junk directories (`node_modules`) unless explicitly forced.
+
 .SH COMMANDS
+
+.SS "Core Workflow"
 .TP
 .B please commit
-Stages your changes, sends the diff to the AI, and lets it split the work into one or more logically coherent commits.
+Analyzes your working tree, skips secrets/junk, stages changes, and uses AI to split your work into logically coherent, beautifully written commits.
 .TP
 .B please push
-Runs commit, then pushes the current branch to origin.
-.TP
-.B please status
-A plain-language view of where you stand.
-.TP
-.B please branch [name]
-List local branches or create and switch to a new branch.
-.TP
-.B please switch <name>
-Switches to an existing branch or creates it.
+Runs \fBplease commit\fR, then pushes to origin. Automatically sets up the upstream tracking branch if it's your first push.
 .TP
 .B please sync [exactly]
-Fetches and merges the current branch's upstream. With 'exactly', discards local commits not on the remote.
+The ultimate pull command. Fetches and merges the upstream. If you add \fBexactly\fR, it aggressively destroys local deviations to perfectly mirror the remote (destructive, requires confirmation).
+
+.SS "Branch Management"
 .TP
-.B please undo / redo
-Undoes the last commit, or brings it back.
+.B please branch \fI[name]\fR
+Lists branches. If a name is provided, creates and immediately switches to it.
 .TP
-.B please move-commit <branch>
-Moves your last commit onto a new branch.
+.B please switch \fI<name>\fR
+Fuzzy-switches to a branch. Offers to create it if missing.
+.TP
+.B please rename \fI<new-name>\fR
+Renames the current branch locally \fIand\fR on the remote simultaneously.
+.TP
+.B please cleanup
+Sweeps away local branches that have already been merged into main.
+
+.SS "Oh Sh*t / Recovery"
+.TP
+.B please undo
+Soft-resets the last commit, leaving your files intact so you can fix your mistakes.
+.TP
+.B please redo
+Brings back the undone commit (provided history hasn't diverged).
 .TP
 .B please discard
-Throws away all uncommitted changes, tracked and untracked.
+Nukes all uncommitted changes from orbit. (Requires confirmation).
 .TP
-.B please stash
-Saves everything in the working tree, tracked and untracked, and clears it.
+.B please move-commit \fI<branch>\fR
+Committed to main by accident? This rips your last commit off and moves it to the specified branch in one motion.
 .TP
-.B please squash [n | ref]
-Combines a run of commits into one, AI-written message and all.
+.B please purge \fI<path>\fR
+Leaked a private key? This uses filter-repo/filter-branch to violently scrub a file from your entire git history.
+
+.SS "History & State"
 .TP
-.B please purge <path>
-Permanently removes a file or folder from your entire git history.
+.B please status
+A sane, readable view of your repository state.
+.TP
+.B please log
+A gorgeous, terminal-optimized commit graph.
+.TP
+.B please squash \fI[n | ref]\fR
+Squashes commits into one, complete with an AI-generated summary message.
+.TP
+.B please stash \fI[list | pop | drop]\fR
+Stashes all changes (including untracked files).
+
+.SS "AI Agent Mode"
+.TP
+.B please \fI"write me a commit and open a PR"\fR
+Natural language fallback. If it's not a standard command, the AI figures out the raw Git/CLI commands needed to achieve your goal and executes them on your behalf.
 .TP
 .B please chat
-The agent kept alive across multiple messages for interactive sessions.
+Starts a persistent, multi-turn conversational session with the AI agent.
+
+.SH EXAMPLES
+
+.B 1. Committing without thinking:
+.EX
+$ please commit
+.EE
+.I (The AI stages files, writes the message, and commits.)
+
+.B 2. Fixing a typo in the branch name:
+.EX
+$ please rename feature/new-ui
+.EE
+
+.B 3. Getting unstuck using the Agent:
+.EX
+$ please "I accidentally deleted my src folder, help me get it back"
+.EE
+
+.B 4. Accessing detailed in-app documentation:
+.EX
+$ please man commit
+$ please push --help
+.EE
+
+.SH ENVIRONMENT VARIABLES
 .TP
-.B please man <command>
-View detailed manual page for a specific command inside the terminal.
+.B PLEASE_API_KEY
+Overrides the globally configured API key for the AI provider.
+.TP
+.B PLEASE_PROVIDER
+Overrides the configured provider (anthropic, google, openai).
+
 .SH FILES
+.TP
 .I ~/.please/config
-Global configuration for AI provider and model choices.
-.br
+Global JSON configuration holding provider preferences and encrypted keys.
+.TP
 .I .git/PLEASE.MD
-Local repository context for the AI.
+Local repository context. The AI reads this to understand your codebase's vibe.
+
+.SH EXIT STATUS
+\fB0\fR   Success. All operations completed cleanly.
+.br
+\fB1\fR   General error (network failure, bad configuration, or Git rejection).
+.br
+\fB130\fR Operation cancelled by the user (Ctrl+C or 'no' on a destructive prompt).
+
+.SH BUGS
+Report bugs on GitHub: \fIhttps://github.com/HylithLabs/please/issues\fR
+
 .SH AUTHOR
-HylithLabs <raiyanbinrashid0@gmail.com>
+Crafted with ❤️ by HylithLabs (Raiyan Bin Rashid <raiyanbinrashid0@gmail.com>).
