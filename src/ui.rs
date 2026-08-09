@@ -68,3 +68,38 @@ pub fn warn(message: &str) {
 pub fn error(message: &str) {
     eprintln!("{} {}", red_bold("error:"), message);
 }
+
+pub fn print_markdown(text: &str) {
+    use termimad::crossterm::style::Color::Rgb;
+    use termimad::MadSkin;
+
+    let mut skin = MadSkin::default();
+    
+    // primary: foreground: #c9d1d9
+    let fg = Rgb { r: 201, g: 209, b: 217 };
+    
+    // normal & bright colors from Please Dark
+    let magenta = Rgb { r: 188, g: 140, b: 255 }; // #bc8cff
+    let cyan = Rgb { r: 57, g: 197, b: 207 };     // #39c5cf
+    let bright_white = Rgb { r: 255, g: 255, b: 255 }; // #ffffff
+    
+    // Slightly lighter backgrounds for code to pop against #0d1117
+    let code_bg = Rgb { r: 22, g: 27, b: 34 };
+    let inline_bg = Rgb { r: 72, g: 79, b: 88 }; // #484f58
+
+    skin.paragraph.set_fg(fg);
+    skin.bold.set_fg(bright_white);
+    skin.italic.set_fg(fg);
+    
+    skin.inline_code.set_fg(cyan);
+    skin.inline_code.set_bg(inline_bg);
+    
+    skin.code_block.set_fg(fg);
+    skin.code_block.set_bg(code_bg);
+    
+    for h in skin.headers.iter_mut() {
+        h.set_fg(magenta);
+    }
+    
+    skin.print_text(text);
+}

@@ -20,6 +20,8 @@ axoupdater = { version = "0.10.0", features = ["blocking"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 ureq = { version = "3.3.0", features = ["json"] }
+termimad = "0.31"
+owo-colors = "4.1.0"
 
 # The profile that 'dist' will build with
 [profile.dist]

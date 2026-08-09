@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use owo_colors::OwoColorize;
 
 use crate::commands::agent;
 use crate::llm;
@@ -15,7 +16,7 @@ pub fn run() {
     println!("Type 'exit' or press Ctrl+D to leave.\n");
 
     loop {
-        print!("> ");
+        print!("{}", "> ".color(owo_colors::Rgb(88, 166, 255))); // blue prompt
         let _ = io::stdout().flush();
 
         let mut input = String::new();
@@ -40,9 +41,12 @@ pub fn run() {
             break;
         }
 
-        eprintln!("Thinking...");
+        eprintln!("{}", "Thinking...".color(owo_colors::Rgb(110, 118, 129))); // bright black
         match session.send(input, &cfg, &system_prompt, &tools, agent::execute_tool) {
-            Ok(text) => println!("{text}\n"),
+            Ok(text) => {
+                crate::ui::print_markdown(&text);
+                println!();
+            }
             Err(err) => eprintln!("Agent failed: {err}\n"),
         }
     }

@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::process::Command;
+use owo_colors::OwoColorize;
 
 use crate::config::{self, Config};
 use crate::context;
@@ -17,10 +18,10 @@ pub fn run(prompt: &str) {
 
     let (cfg, system_prompt, tools) = prepare_session();
 
-    eprintln!("Thinking...");
+    eprintln!("{}", "Thinking...".color(owo_colors::Rgb(110, 118, 129)));
 
     match llm::run_agent(prompt, &cfg, &system_prompt, &tools, execute_tool) {
-        Ok(text) => println!("{text}"),
+        Ok(text) => crate::ui::print_markdown(&text),
         Err(err) => {
             eprintln!("Agent failed: {err}");
             std::process::exit(1);
@@ -158,7 +159,7 @@ fn run_external(bin: &str, args_json: &serde_json::Value) -> String {
     }
 
     let command_line = format!("{bin} {}", args.join(" "));
-    eprintln!("-> {command_line}");
+    eprintln!("{}", format!("-> {command_line}").color(owo_colors::Rgb(210, 153, 34))); // yellow
 
     if is_destructive(bin, &args) && !confirm_destructive(&command_line) {
         return "The developer declined to run this command.".to_string();
@@ -189,7 +190,7 @@ fn run_please_subcommand(args_json: &serde_json::Value) -> String {
         return "Couldn't locate the please binary to run a subcommand.".to_string();
     };
 
-    eprintln!("-> please {command} {}", extra.join(" "));
+    eprintln!("{}", format!("-> please {command} {}", extra.join(" ")).color(owo_colors::Rgb(210, 153, 34))); // yellow
 
     capture_output(Command::new(exe).arg(command).args(&extra))
 }
@@ -245,7 +246,7 @@ fn is_destructive(bin: &str, args: &[String]) -> bool {
 }
 
 fn confirm_destructive(command_line: &str) -> bool {
-    eprint!("The agent wants to run `{command_line}`, which looks destructive. Allow it? [y/N]: ");
+    eprint!("{}", format!("The agent wants to run `{command_line}`, which looks destructive. Allow it? [y/N]: ").color(owo_colors::Rgb(255, 123, 114))); // red
     let _ = io::stderr().flush();
 
     let mut input = String::new();
