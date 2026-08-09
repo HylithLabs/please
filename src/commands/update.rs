@@ -22,7 +22,24 @@ pub fn run() {
     };
 
     match updater.run_sync() {
-        Ok(Some(result)) => ui::success(&format!("updated to v{}", result.new_version)),
+        Ok(Some(result)) => {
+            ui::success(&format!("updated to v{}", result.new_version));
+
+            if let Ok(response) = ureq::get(&format!(
+                "https://api.github.com/repos/HylithLabs/please/releases/tags/v{}",
+                result.new_version
+            ))
+            .set("User-Agent", "please-cli")
+            .call()
+            {
+                if let Ok(json) = response.into_json::<serde_json::Value>() {
+                    if let Some(body) = json.get("body").and_then(|s| s.as_str()) {
+                        println!("\n🚀 What's New:\n");
+                        ui::print_markdown(body);
+                    }
+                }
+            }
+        }
         Ok(None) => ui::success("already up to date"),
         Err(err) => {
             ui::error(&format!("update failed: {err}"));
