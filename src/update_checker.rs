@@ -26,15 +26,14 @@ pub fn check_and_notify() {
         .as_secs();
 
     // Check if we should notify
-    if let Some(latest) = &cache.latest_version {
-        if Some(latest) != cache.ignored_version.as_ref()
-            && is_newer(latest, env!("CARGO_PKG_VERSION"))
-        {
-            println!(
-                "\n✨ A new version of please is available (v{})! Run 'please update' to install, or 'please update ignore' to hide.",
-                latest
-            );
-        }
+    if let Some(latest) = &cache.latest_version
+        && Some(latest) != cache.ignored_version.as_ref()
+        && is_newer(latest, env!("CARGO_PKG_VERSION"))
+    {
+        println!(
+            "\n✨ A new version of please is available (v{})! Run 'please update' to install, or 'please update ignore' to hide.",
+            latest
+        );
     }
 
     // Update the cache silently in background if older than 24h
