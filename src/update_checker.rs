@@ -68,28 +68,29 @@ pub fn ignore_latest_version() {
 }
 
 pub fn run_internal_check() {
-    if let Ok(response) =
+    if let Ok(mut response) =
         ureq::get("https://api.github.com/repos/HylithLabs/please/releases/latest")
             .header("User-Agent", "please-cli")
             .call()
     {
-        if let Ok(json) = response.into_json::<serde_json::Value>() {
-            if let Some(tag) = json.get("tag_name").and_then(|s| s.as_str()) {
-                let version = tag.trim_start_matches('v');
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-                let cache = UpdateCache {
-                    last_checked_timestamp: now,
-                    latest_version: Some(version.to_string()),
-                    ignored_version: None,
-                };
-                let _ = fs::create_dir_all(crate::config::config_dir());
-                let _ = fs::write(
-                    cache_path(),
-                    serde_json::to_string(&cache).unwrap_or_default(),
-                );
+        use std::io::Read;
+        let mut body_str = String::new();
+        if response.body_mut().read_to_string(&mut body_str).is_ok() {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
+                if let Some(tag) = json.get("tag_name").and_then(|s| s.as_str()) {
+                    let version = tag.trim_start_matches('v');
+                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    let cache = UpdateCache {
+                        last_checked_timestamp: now,
+                        latest_version: Some(version.to_string()),
+                        ignored_version: None,
+                    };
+                    let _ = fs::create_dir_all(crate::config::config_dir());
+                    let _ = fs::write(
+                        cache_path(),
+                        serde_json::to_string(&cache).unwrap_or_default(),
+                    );
+                }
             }
         }
     }

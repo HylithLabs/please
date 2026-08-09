@@ -30,17 +30,21 @@ pub fn run(args: &[String]) {
         Ok(Some(result)) => {
             ui::success(&format!("updated to v{}", result.new_version));
 
-            if let Ok(response) = ureq::get(&format!(
+            if let Ok(mut response) = ureq::get(&format!(
                 "https://api.github.com/repos/HylithLabs/please/releases/tags/v{}",
                 result.new_version
             ))
             .header("User-Agent", "please-cli")
             .call()
             {
-                if let Ok(json) = response.into_json::<serde_json::Value>() {
-                    if let Some(body) = json.get("body").and_then(|s| s.as_str()) {
-                        println!("\n🚀 What's New:\n");
-                        ui::print_markdown(body);
+                use std::io::Read;
+                let mut body_str = String::new();
+                if response.body_mut().read_to_string(&mut body_str).is_ok() {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
+                        if let Some(body) = json.get("body").and_then(|s| s.as_str()) {
+                            println!("\n🚀 What's New:\n");
+                            ui::print_markdown(body);
+                        }
                     }
                 }
             }
