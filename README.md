@@ -198,7 +198,9 @@ Give `please` a shorter name, like `pls` or `plz`, so casual daily use is less t
 
 ### `please update`
 
-Updates `please` itself to the latest release in place, no reinstalling by hand. Only works if you installed it via the shell/PowerShell installer or Homebrew above — those leave behind a record of how they installed it that this reads; a `cargo install --path .` build has no such record, so it's told to rebuild from source instead of failing mysteriously.
+Updates `please` itself to the latest release in place, using the receipt left behind by `cargo-dist` (or `brew upgrade please` if installed via Homebrew).
+
+Run `please update ignore` to hide an update notification and stop it from showing up on every command until a newer version is out.
 
 ## Design notes
 

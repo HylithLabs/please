@@ -30,7 +30,7 @@ const COMMANDS: &[(&str, CommandFn)] = &[
     ("alias", commands::alias::run),
     ("man", commands::man::run),
     ("help", |_| commands::help::run()),
-    ("update", |_| commands::update::run()),
+    ("update", commands::update::run),
 ];
 
 /// Small words that show up in a casual sentence but were never meant as an

@@ -82,7 +82,7 @@ fn get_manual(cmd: &str) -> Option<&'static str> {
             "NAME\n    please setup - configure AI providers and API keys\n\nDESCRIPTION\n    Configure AI providers and API keys, switch between saved ones, and change the model used.",
         ),
         "update" => Some(
-            "NAME\n    please update - update please itself\n\nDESCRIPTION\n    Updates `please` itself to the latest release in place, no reinstalling by hand.",
+            "NAME\n    please update - update please itself\n\nSYNOPSIS\n    please update\n    please update ignore\n\nDESCRIPTION\n    Updates `please` itself to the latest release in place, no reinstalling by hand.\n\n    If `please update ignore` is used, it hides the current update notification and prevents it from appearing again until an even newer version is released.",
         ),
         _ => None,
     }
