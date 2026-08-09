@@ -34,7 +34,7 @@ pub fn run(args: &[String]) {
                 "https://api.github.com/repos/HylithLabs/please/releases/tags/v{}",
                 result.new_version
             ))
-            .set("User-Agent", "please-cli")
+            .header("User-Agent", "please-cli")
             .call()
             {
                 if let Ok(json) = response.into_json::<serde_json::Value>() {

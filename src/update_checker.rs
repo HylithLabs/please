@@ -70,7 +70,7 @@ pub fn ignore_latest_version() {
 pub fn run_internal_check() {
     if let Ok(response) =
         ureq::get("https://api.github.com/repos/HylithLabs/please/releases/latest")
-            .set("User-Agent", "please-cli")
+            .header("User-Agent", "please-cli")
             .call()
     {
         if let Ok(json) = response.into_json::<serde_json::Value>() {
@@ -83,6 +83,7 @@ pub fn run_internal_check() {
                 let cache = UpdateCache {
                     last_checked_timestamp: now,
                     latest_version: Some(version.to_string()),
+                    ignored_version: None,
                 };
                 let _ = fs::create_dir_all(crate::config::config_dir());
                 let _ = fs::write(
