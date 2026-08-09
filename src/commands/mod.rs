@@ -7,6 +7,7 @@ pub mod commit;
 pub mod discard;
 pub mod help;
 pub mod log;
+pub mod man;
 pub mod move_commit;
 pub mod purge;
 pub mod push;

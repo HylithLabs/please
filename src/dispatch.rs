@@ -28,6 +28,7 @@ const COMMANDS: &[(&str, CommandFn)] = &[
     ("purge", commands::purge::run),
     ("chat", |_| commands::chat::run()),
     ("alias", commands::alias::run),
+    ("man", commands::man::run),
     ("help", |_| commands::help::run()),
     ("update", |_| commands::update::run()),
 ];
@@ -53,7 +54,12 @@ pub fn route(words: &[String]) {
     }
 
     if let Some(run) = exact_command(first).or_else(|| fuzzy_command(first)) {
-        run(&strip_filler(&words[1..]));
+        let args = strip_filler(&words[1..]);
+        if args.iter().any(|arg| arg == "-h" || arg == "--help") {
+            commands::man::run(&[first.clone()]);
+            return;
+        }
+        run(&args);
         return;
     }
 
