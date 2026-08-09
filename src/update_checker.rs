@@ -79,7 +79,10 @@ pub fn run_internal_check() {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
                 if let Some(tag) = json.get("tag_name").and_then(|s| s.as_str()) {
                     let version = tag.trim_start_matches('v');
-                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
                     let cache = UpdateCache {
                         last_checked_timestamp: now,
                         latest_version: Some(version.to_string()),

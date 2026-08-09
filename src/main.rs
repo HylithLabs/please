@@ -10,7 +10,6 @@ mod llm;
 mod sensitive;
 mod ui;
 mod update_checker;
-mod test_ureq;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
