@@ -56,7 +56,7 @@ pub fn route(words: &[String]) {
     if let Some(run) = exact_command(first).or_else(|| fuzzy_command(first)) {
         let args = strip_filler(&words[1..]);
         if args.iter().any(|arg| arg == "-h" || arg == "--help") {
-            commands::man::run(&[first.clone()]);
+            commands::man::run(std::slice::from_ref(first));
             return;
         }
         run(&args);
