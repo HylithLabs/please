@@ -255,7 +255,9 @@ fn is_destructive(bin: &str, args: &[String]) -> bool {
 
 fn confirm_command(command_line: &str, destructive: bool) -> bool {
     let msg = if destructive {
-        format!("The agent wants to run `{command_line}`, which looks destructive. Allow it? [y/N]: ")
+        format!(
+            "The agent wants to run `{command_line}`, which looks destructive. Allow it? [y/N]: "
+        )
     } else {
         format!("The agent wants to run `{command_line}`. Allow it? [y/N]: ")
     };

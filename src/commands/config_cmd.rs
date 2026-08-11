@@ -21,7 +21,7 @@ fn interactive_config() {
     loop {
         let is_on = config::is_feedback_enabled();
         let checkbox = if is_on { "[x]" } else { "[ ]" };
-        
+
         println!("What would you like to configure?");
         println!("  1) Feedback loop {}", checkbox);
         println!("  2) Exit");
@@ -54,7 +54,11 @@ pub fn run(args: &[String]) {
     match args[0].as_str() {
         "feedback" => {
             if args.len() < 2 {
-                let state = if config::is_feedback_enabled() { "on" } else { "off" };
+                let state = if config::is_feedback_enabled() {
+                    "on"
+                } else {
+                    "off"
+                };
                 println!("Feedback loop is currently {}.", state);
                 return;
             }
@@ -62,7 +66,9 @@ pub fn run(args: &[String]) {
                 "on" | "true" | "1" => true,
                 "off" | "false" | "0" => false,
                 other => {
-                    ui::error(&format!("Invalid value '{other}' for feedback. Use 'on' or 'off'."));
+                    ui::error(&format!(
+                        "Invalid value '{other}' for feedback. Use 'on' or 'off'."
+                    ));
                     return;
                 }
             };
