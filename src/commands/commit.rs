@@ -62,6 +62,14 @@ pub fn run() {
                     crate::ui::step(&format!("Commit {}/{total}", index + 1));
                 }
 
+                if crate::dispatch::wants_feedback() {
+                    let msg = format!("Commit with message: '{}'?", group.message.trim());
+                    if !crate::ui::confirm(&msg) {
+                        crate::ui::warn("Skipped commit.");
+                        continue;
+                    }
+                }
+
                 if git::commit(&group.message) {
                     crate::ui::success(&format!(
                         "Committed: {}",

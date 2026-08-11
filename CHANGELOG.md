@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.1.6
+
+* Added global `--feedback` / `-f` flag for interactive confirmation before destructive or major commands (like commit, push, and agent operations)
+* Implemented `please config` interactive menu to persistently toggle the feedback loop
+
+
 ## Version 0.1.5
 
 * Implemented background update checking mechanism for zero latency

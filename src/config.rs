@@ -41,6 +41,7 @@ struct ProviderEntry {
 struct Store {
     active: Option<String>,
     providers: BTreeMap<String, ProviderEntry>,
+    feedback: bool,
 }
 
 fn read_store() -> Store {
@@ -73,6 +74,10 @@ fn read_store() -> Store {
     for line in contents.lines() {
         if let Some(value) = line.strip_prefix("active=") {
             store.active = Some(value.to_string());
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("feedback=") {
+            store.feedback = value == "true";
             continue;
         }
         let Some((key, value)) = line.split_once('=') else {
@@ -121,6 +126,9 @@ fn write_store(store: &Store) -> io::Result<()> {
     if let Some(active) = &store.active {
         contents.push_str(&format!("active={active}\n"));
     }
+    if store.feedback {
+        contents.push_str("feedback=true\n");
+    }
     for (provider, entry) in &store.providers {
         let Some(api_key) = &entry.api_key else {
             continue;
@@ -141,6 +149,16 @@ fn write_store(store: &Store) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+pub fn is_feedback_enabled() -> bool {
+    read_store().feedback
+}
+
+pub fn set_feedback_enabled(enabled: bool) -> io::Result<()> {
+    let mut store = read_store();
+    store.feedback = enabled;
+    write_store(&store)
 }
 
 /// Loads the currently active provider's config — the one `please` uses

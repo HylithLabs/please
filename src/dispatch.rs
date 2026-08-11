@@ -1,4 +1,12 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::commands;
+
+pub static FEEDBACK: AtomicBool = AtomicBool::new(false);
+
+pub fn wants_feedback() -> bool {
+    FEEDBACK.load(Ordering::Relaxed)
+}
 
 /// Shape every literal `please` subcommand is normalized to, so exact and
 /// fuzzy matching can treat them uniformly regardless of whether the
@@ -7,6 +15,7 @@ type CommandFn = fn(&[String]);
 
 /// Every literal `please` subcommand, normalized to `CommandFn`.
 const COMMANDS: &[(&str, CommandFn)] = &[
+    ("config", commands::config_cmd::run),
     ("commit", |_| commands::commit::run()),
     ("push", |_| commands::push::run()),
     ("setup", |_| commands::setup::run()),

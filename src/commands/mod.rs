@@ -4,6 +4,7 @@ pub mod branch;
 pub mod chat;
 pub mod cleanup;
 pub mod commit;
+pub mod config_cmd;
 pub mod discard;
 pub mod help;
 pub mod log;

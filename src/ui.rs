@@ -69,6 +69,20 @@ pub fn error(message: &str) {
     eprintln!("{} {}", red_bold("error:"), message);
 }
 
+pub fn confirm(message: &str) -> bool {
+    use std::io::Write;
+    eprint!("{} {} [y/N]: ", cyan_bold("?"), bold(message));
+    let _ = std::io::stderr().flush();
+
+    let mut input = String::new();
+    if std::io::stdin().read_line(&mut input).is_ok() {
+        let input = input.trim().to_lowercase();
+        input == "y" || input == "yes"
+    } else {
+        false
+    }
+}
+
 pub fn print_markdown(text: &str) {
     use termimad::MadSkin;
     use termimad::crossterm::style::Color::Rgb;

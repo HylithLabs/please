@@ -164,7 +164,9 @@ fn run_external(bin: &str, args_json: &serde_json::Value) -> String {
         format!("-> {command_line}").color(owo_colors::Rgb(210, 153, 34))
     ); // yellow
 
-    if is_destructive(bin, &args) && !confirm_destructive(&command_line) {
+    let destructive = is_destructive(bin, &args);
+    let needs_confirm = crate::dispatch::wants_feedback() || destructive;
+    if needs_confirm && !confirm_command(&command_line, destructive) {
         return "The developer declined to run this command.".to_string();
     }
 
@@ -251,14 +253,13 @@ fn is_destructive(bin: &str, args: &[String]) -> bool {
     }
 }
 
-fn confirm_destructive(command_line: &str) -> bool {
-    eprint!(
-        "{}",
-        format!(
-            "The agent wants to run `{command_line}`, which looks destructive. Allow it? [y/N]: "
-        )
-        .color(owo_colors::Rgb(255, 123, 114))
-    ); // red
+fn confirm_command(command_line: &str, destructive: bool) -> bool {
+    let msg = if destructive {
+        format!("The agent wants to run `{command_line}`, which looks destructive. Allow it? [y/N]: ")
+    } else {
+        format!("The agent wants to run `{command_line}`. Allow it? [y/N]: ")
+    };
+    eprint!("{}", msg.color(owo_colors::Rgb(255, 123, 114)));
     let _ = io::stderr().flush();
 
     let mut input = String::new();
