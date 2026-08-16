@@ -23,6 +23,11 @@ fn main() {
     }
     args.retain(|a| a != "--feedback" && a != "-f");
 
+    let is_update = args.get(1).map(|s| s.as_str()) == Some("update");
+
     dispatch::route(&args[1..]);
-    update_checker::check_and_notify();
+
+    if !is_update {
+        update_checker::check_and_notify();
+    }
 }
