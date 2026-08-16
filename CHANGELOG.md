@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.1.7
+
+* Overhauled the AI agent's permission system: every mutating `git`/`gh`/`please` action now asks for confirmation by default, replacing the old destructive-flag blocklist with a read-only allowlist so nothing risky slips through unflagged
+* Commands that can only be confirmed interactively (discard, purge, revert, squash, sync exactly, stash drop, switching to a new branch) are now refused up front by the agent instead of silently failing after a wasted round trip
+* Fixed `please chat` reasoning from a stale, turn-one snapshot of branch/upstream/working-tree state for the whole session — repo state is now refreshed before every message
+* The agent's reasoning is now printed before it runs a tool, so confirmation prompts aren't answered blind
+* Fixed `please update` showing a redundant "update available" notice right after updating
+* Fixed release notes never showing after `please update`: the lookup guessed a `v{version}` tag that doesn't match every release (0.1.6 is tagged plain `0.1.6`), so it 404'd silently — now fetches by "latest" instead
+
 ## Version 0.1.6
 
 * Added global `--feedback` / `-f` flag for interactive confirmation before destructive or major commands (like commit, push, and agent operations)
