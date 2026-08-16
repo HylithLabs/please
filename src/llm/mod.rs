@@ -119,7 +119,19 @@ impl AgentSession {
                     self.history = working;
                     return Ok(text);
                 }
-                AgentTurn::ToolCalls { calls, text } => (calls, text),
+                AgentTurn::ToolCalls { calls, text } => {
+                    // Surfaced *before* the tool calls run: the developer is
+                    // about to be asked to confirm one of them, and "the
+                    // agent wants to run `git stash`, allow it?" is a much
+                    // easier call with the model's own reason attached than
+                    // without it.
+                    if let Some(note) = text.as_deref().map(str::trim)
+                        && !note.is_empty()
+                    {
+                        crate::ui::agent_note(note);
+                    }
+                    (calls, text)
+                }
             };
 
             if turn == MAX_TURNS {

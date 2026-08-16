@@ -69,6 +69,17 @@ pub fn error(message: &str) {
     eprintln!("{} {}", red_bold("error:"), message);
 }
 
+/// The agent's own stated reasoning for the tool calls it's about to make,
+/// printed before they run so a confirmation prompt is never answered
+/// blind. Dimmed rather than run through `print_markdown` so it reads as
+/// in-progress narration, distinct from a final answer.
+pub fn agent_note(text: &str) {
+    for line in text.trim().lines() {
+        println!("{}", dim(line));
+    }
+    println!();
+}
+
 pub fn confirm(message: &str) -> bool {
     use std::io::Write;
     eprint!("{} {} [y/N]: ", cyan_bold("?"), bold(message));
