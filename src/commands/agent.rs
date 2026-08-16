@@ -16,7 +16,8 @@ pub fn run(prompt: &str) {
         std::process::exit(1);
     }
 
-    let (cfg, system_prompt, tools) = prepare_session();
+    let (cfg, base_prompt, tools) = prepare_session();
+    let system_prompt = format!("{base_prompt}{}", dynamic_state());
 
     eprintln!("{}", "Thinking...".color(owo_colors::Rgb(110, 118, 129)));
 
@@ -30,8 +31,16 @@ pub fn run(prompt: &str) {
 }
 
 /// Loads config, generates/loads the cached project description, and builds
-/// the system prompt and tool catalog every agent invocation needs — shared
-/// between the one-shot `please "..."` and the long-lived `please chat`.
+/// the *static* half of the system prompt — everything except live repo
+/// state — plus the tool catalog. Shared between the one-shot `please "..."`
+/// and the long-lived `please chat`.
+///
+/// Repo state (branch, upstream, pending changes) is deliberately left out
+/// here and appended fresh via [`dynamic_state`] right before each request
+/// instead of baked in once: a chat session lives across many turns, and
+/// every mutating tool call it runs can change that state. A git specialist
+/// reasoning from a turn-1 snapshot after five tool calls have moved the
+/// branch is reasoning from stale, effectively hallucinated context.
 pub(crate) fn prepare_session() -> (Config, String, Vec<ToolSpec>) {
     let Some(mut cfg) = config::load() else {
         eprintln!("No LLM provider configured. Run `please setup` first.");
@@ -44,8 +53,25 @@ pub(crate) fn prepare_session() -> (Config, String, Vec<ToolSpec>) {
         let _ = config::save(&cfg);
     }
 
-    let system_prompt = build_system_prompt(project_context.as_deref());
-    (cfg, system_prompt, tool_specs())
+    let base_prompt = build_system_prompt(project_context.as_deref());
+    (cfg, base_prompt, tool_specs())
+}
+
+/// The live repo state to append to the base system prompt right before
+/// every request — see [`prepare_session`] for why this stays separate
+/// instead of being folded in once.
+pub(crate) fn dynamic_state() -> String {
+    let mut state = format!("\n\nCurrent branch: {}", git::current_branch());
+    match git::upstream_branch() {
+        Some(upstream) => state.push_str(&format!(" (tracking {upstream})")),
+        None => state.push_str(" (no upstream set)"),
+    }
+    state.push_str(if git::has_pending_changes() {
+        "\nWorking tree has uncommitted changes."
+    } else {
+        "\nWorking tree is clean."
+    });
+    state
 }
 
 fn build_system_prompt(project_context: Option<&str>) -> String {
@@ -76,17 +102,6 @@ fn build_system_prompt(project_context: Option<&str>) -> String {
         prompt.push_str("\n\nProject context:\n");
         prompt.push_str(context);
     }
-
-    prompt.push_str(&format!("\n\nCurrent branch: {}", git::current_branch()));
-    match git::upstream_branch() {
-        Some(upstream) => prompt.push_str(&format!(" (tracking {upstream})")),
-        None => prompt.push_str(" (no upstream set)"),
-    }
-    prompt.push_str(if git::has_pending_changes() {
-        "\nWorking tree has uncommitted changes."
-    } else {
-        "\nWorking tree is clean."
-    });
 
     prompt
 }

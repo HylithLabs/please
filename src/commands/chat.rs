@@ -9,7 +9,7 @@ use crate::llm;
 /// messages instead of starting over each time — so a follow-up like "now
 /// undo that" or "why did it fail" actually has something to refer to.
 pub fn run() {
-    let (cfg, system_prompt, tools) = agent::prepare_session();
+    let (cfg, base_prompt, tools) = agent::prepare_session();
     let mut session = llm::AgentSession::new();
 
     println!("please chat — describe what you want, one message at a time.");
@@ -42,6 +42,10 @@ pub fn run() {
         }
 
         eprintln!("{}", "Thinking...".color(owo_colors::Rgb(110, 118, 129))); // bright black
+        // Rebuilt fresh every turn — earlier turns in this same session may
+        // have branched, committed, or stashed, so a snapshot taken once at
+        // startup would go stale the moment the first tool call runs.
+        let system_prompt = format!("{base_prompt}{}", agent::dynamic_state());
         match session.send(input, &cfg, &system_prompt, &tools, agent::execute_tool) {
             Ok(text) => {
                 crate::ui::print_markdown(&text);
