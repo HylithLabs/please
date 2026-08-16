@@ -30,12 +30,16 @@ pub fn run(args: &[String]) {
         Ok(Some(result)) => {
             ui::success(&format!("updated to v{}", result.new_version));
 
-            if let Ok(mut response) = ureq::get(&format!(
-                "https://api.github.com/repos/HylithLabs/please/releases/tags/v{}",
-                result.new_version
-            ))
-            .header("User-Agent", "please-cli")
-            .call()
+            // Fetched by "latest", not by reconstructing a `v{version}` tag:
+            // release tags haven't been consistent (some are `v0.1.5`, the
+            // 0.1.6 release is tagged plain `0.1.6`), so guessing the tag
+            // 404s silently and this never prints. `please update` always
+            // lands on the newest release anyway, so asking GitHub for
+            // "latest" sidesteps the tag format entirely.
+            if let Ok(mut response) =
+                ureq::get("https://api.github.com/repos/HylithLabs/please/releases/latest")
+                    .header("User-Agent", "please-cli")
+                    .call()
                 && let Ok(body_str) = response.body_mut().read_to_string()
                 && let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str)
                 && let Some(body) = json.get("body").and_then(|s| s.as_str())
