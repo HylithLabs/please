@@ -58,14 +58,14 @@ fn build_system_prompt(project_context: Option<&str>) -> String {
          committing, cleanup, restoring deleted files, reverting commits, stashing, and so on). \
          Fall back to run_git or run_gh for things please doesn't wrap: inspecting state, tags, \
          diffs, GitHub PRs/issues, and the like.\n\n\
-         A few please subcommands normally ask for interactive confirmation before doing \
-         something destructive (please discard, please sync exactly, please revert, please \
-         stash drop, please purge, please squash, and please switch when the branch doesn't \
-         exist yet). Run through you, they can't be confirmed \
-         non-interactively, so they'll cancel themselves and say so — that's not a bug, don't \
-         retry them. Tell the developer to run that command directly so they can confirm it \
-         themselves. To create a new branch, use `please branch <name>` (creates and switches, \
-         no confirmation needed) rather than `please switch <name>`.\n\n\
+         Every action that changes repo state — a git/gh mutation or a please subcommand — asks \
+         the developer to confirm before it runs; the answer comes back as tool output, not as \
+         a message to you. A few commands (discard, purge, revert, squash, sync exactly, stash \
+         drop, and switching to a branch that doesn't exist yet) can only be confirmed by \
+         someone typing at a real keyboard — for those the tool tells you to have the developer \
+         run it directly instead of retrying. To create a new branch, use `please branch \
+         <name>` (creates and switches, no confirmation needed) rather than `please switch \
+         <name>`.\n\n\
          Work in as few tool calls as you need, and don't repeat a call you already made. Once \
          the task is done — or you can't do it and need to explain why — respond with plain \
          text and no further tool calls. That ends the conversation, so make it a real answer \
@@ -113,11 +113,18 @@ fn tool_specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "run_please",
-            description: "Run a `please` subcommand: one of status, branch, switch, sync, undo, redo, move-commit, discard, restore, rename, cleanup, log, revert, stash, purge, squash, commit, push, update. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, list/pop/drop for stash, a path for purge, or a count/ref for squash).",
+            description: "Run a `please` subcommand. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, list/pop/drop for stash, a path for purge, or a count/ref for squash).",
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "command": { "type": "string" },
+                    "command": {
+                        "type": "string",
+                        "enum": [
+                            "status", "branch", "switch", "sync", "undo", "redo",
+                            "move-commit", "discard", "restore", "rename", "cleanup", "log",
+                            "revert", "stash", "purge", "squash", "commit", "push", "update"
+                        ]
+                    },
                     "args": { "type": "array", "items": { "type": "string" } }
                 },
                 "required": ["command"]
@@ -149,9 +156,9 @@ fn extract_args(value: &serde_json::Value) -> Vec<String> {
 }
 
 /// Runs an external `git`/`gh` invocation with captured output, so the model
-/// gets real text back to reason about. Anything that looks destructive is
+/// gets real text back to reason about. Anything that isn't read-only is
 /// gated behind an interactive confirmation first — the same "explain, then
-/// require an explicit yes" pattern every destructive `please` command uses.
+/// require an explicit yes" pattern every mutating `please` command uses.
 fn run_external(bin: &str, args_json: &serde_json::Value) -> String {
     let args = extract_args(args_json);
     if args.is_empty() {
@@ -164,9 +171,19 @@ fn run_external(bin: &str, args_json: &serde_json::Value) -> String {
         format!("-> {command_line}").color(owo_colors::Rgb(210, 153, 34))
     ); // yellow
 
-    let destructive = is_destructive(bin, &args);
-    let needs_confirm = crate::dispatch::wants_feedback() || destructive;
-    if needs_confirm && !confirm_command(&command_line, destructive) {
+    let read_only = if bin == "git" {
+        git_read_only(&args)
+    } else {
+        gh_read_only(&args)
+    };
+    let high_risk = !read_only
+        && if bin == "git" {
+            git_high_risk(&args)
+        } else {
+            gh_high_risk(&args)
+        };
+    let needs_confirm = crate::dispatch::wants_feedback() || !read_only;
+    if needs_confirm && !confirm_command(&command_line, high_risk) {
         return "The developer declined to run this command.".to_string();
     }
 
@@ -178,27 +195,53 @@ fn run_external(bin: &str, args_json: &serde_json::Value) -> String {
 /// exiting the process on failure), so shelling out is what lets one of them
 /// fail without taking the agent down with it.
 ///
-/// Stdin is closed (not inherited), so a subcommand that needs interactive
-/// confirmation (e.g. `please discard`, or `please switch` to a branch that
-/// doesn't exist yet) safely reads EOF and cancels itself, the same as it
-/// would for any non-interactive caller — nothing destructive can happen
-/// without a developer physically at the keyboard. The command's own
-/// "Cancelled." text comes back to the model so it can tell the developer
-/// to run it themselves, instead of assuming a 0 exit code meant success.
+/// Every mutating subcommand is confirmed *before* it's spawned — unlike
+/// `git`/`gh`, a `please` subcommand can't be trusted to gate itself (most
+/// don't ask anything at all; `please stash` and `please switch <existing
+/// branch>` used to run instantly with no human in the loop). The ones that
+/// only know how to ask via a typed "yes" at a real keyboard
+/// (`Risk::InteractiveOnly`) are refused up front instead of spawned with
+/// stdin closed — that used to silently read EOF and cancel itself, which
+/// wasted a round trip and gave the model a confusing "it just failed"
+/// result instead of a clear "go ask the developer" one.
 fn run_please_subcommand(args_json: &serde_json::Value) -> String {
     let Some(command) = args_json.get("command").and_then(|v| v.as_str()) else {
         return "Missing 'command' for run_please.".to_string();
     };
     let extra = extract_args(args_json);
-
-    let Ok(exe) = std::env::current_exe() else {
-        return "Couldn't locate the please binary to run a subcommand.".to_string();
+    let command_line = if extra.is_empty() {
+        format!("please {command}")
+    } else {
+        format!("please {command} {}", extra.join(" "))
     };
 
     eprintln!(
         "{}",
-        format!("-> please {command} {}", extra.join(" ")).color(owo_colors::Rgb(210, 153, 34))
+        format!("-> {command_line}").color(owo_colors::Rgb(210, 153, 34))
     ); // yellow
+
+    match please_risk(command, &extra) {
+        Risk::InteractiveOnly => {
+            return format!(
+                "`{command_line}` can only be confirmed by someone typing at a real keyboard. \
+                 Tell the developer to run `{command_line}` themselves — don't retry it."
+            );
+        }
+        Risk::ReadOnly => {
+            if crate::dispatch::wants_feedback() && !confirm_command(&command_line, false) {
+                return "The developer declined to run this command.".to_string();
+            }
+        }
+        Risk::Mutating => {
+            if !confirm_command(&command_line, false) {
+                return "The developer declined to run this command.".to_string();
+            }
+        }
+    }
+
+    let Ok(exe) = std::env::current_exe() else {
+        return "Couldn't locate the please binary to run a subcommand.".to_string();
+    };
 
     capture_output(Command::new(exe).arg(command).args(&extra))
 }
@@ -233,23 +276,117 @@ fn capture_output(command: &mut Command) -> String {
     result
 }
 
-/// Best-effort recognition of the git/gh invocations that discard work or
-/// history — not exhaustive, but catches the common ones so the agent can't
-/// silently run something a developer would want a chance to stop.
-fn is_destructive(bin: &str, args: &[String]) -> bool {
-    let has = |flag: &str| args.iter().any(|a| a == flag);
+/// Git verbs that only ever inspect state. Deliberately an allowlist rather
+/// than a blocklist of "dangerous" flags: a blocklist has to guess every
+/// risky flag combination up front and silently misses whatever it didn't
+/// think of, while an allowlist only has to name the small, stable set of
+/// commands that are safe by construction — everything else defaults to
+/// asking first, which is the safe direction to be wrong in.
+const GIT_READ_VERBS: &[&str] = &[
+    "status",
+    "log",
+    "diff",
+    "show",
+    "blame",
+    "shortlog",
+    "describe",
+    "rev-parse",
+    "ls-files",
+    "ls-tree",
+    "cat-file",
+    "reflog",
+    "grep",
+];
 
-    if bin == "git" {
-        (has("push") && (has("--force") || has("-f") || has("--force-with-lease")))
-            || (has("reset") && has("--hard"))
-            || (has("clean") && args.iter().any(|a| a.starts_with('-') && a.contains('f')))
-            || (has("branch") && has("-D"))
-            || (has("push") && has("--delete"))
-            || args
-                .iter()
-                .any(|a| a == "filter-branch" || a == "filter-repo")
-    } else {
-        has("delete") || has("close")
+fn git_read_only(args: &[String]) -> bool {
+    let Some(verb) = args.first().map(String::as_str) else {
+        return false;
+    };
+    if GIT_READ_VERBS.contains(&verb) {
+        return true;
+    }
+    // `branch`/`tag`/`remote` are read-only in their bare listing form, but
+    // mutate the moment a name or non-listing flag shows up.
+    match verb {
+        "branch" | "tag" => args[1..]
+            .iter()
+            .all(|a| matches!(a.as_str(), "-a" | "-r" | "-v" | "--list")),
+        "remote" => args[1..].iter().all(|a| a == "-v"),
+        _ => false,
+    }
+}
+
+/// Git invocations that don't just mutate but discard work or history
+/// outright — flagged with a stronger warning in the confirmation prompt,
+/// though the gate itself already caught them via `git_read_only`.
+fn git_high_risk(args: &[String]) -> bool {
+    let has = |flag: &str| args.iter().any(|a| a == flag);
+    (has("push") && (has("--force") || has("-f") || has("--force-with-lease")))
+        || (has("reset") && has("--hard"))
+        || (has("clean") && args.iter().any(|a| a.starts_with('-') && a.contains('f')))
+        || (has("branch") && has("-D"))
+        || (has("push") && has("--delete"))
+        || args
+            .iter()
+            .any(|a| a == "filter-branch" || a == "filter-repo")
+}
+
+const GH_READ_NOUNS: &[&str] = &["pr", "issue", "repo", "run", "release", "workflow", "gist"];
+const GH_READ_ACTIONS: &[&str] = &["list", "view", "diff", "checks", "status"];
+
+fn gh_read_only(args: &[String]) -> bool {
+    let Some(noun) = args.first().map(String::as_str) else {
+        return false;
+    };
+    if noun == "status" {
+        return true;
+    }
+    let Some(action) = args.get(1).map(String::as_str) else {
+        return false;
+    };
+    GH_READ_NOUNS.contains(&noun) && GH_READ_ACTIONS.contains(&action)
+}
+
+fn gh_high_risk(args: &[String]) -> bool {
+    args.iter().any(|a| a == "delete" || a == "close")
+}
+
+/// How risky a `please` subcommand invocation is, decided from the actual
+/// command and arguments rather than a prose promise the model might not
+/// follow.
+enum Risk {
+    /// Inspects state only — runs immediately.
+    ReadOnly,
+    /// Changes repo state but is reversible — confirmed once before running.
+    Mutating,
+    /// Only confirmable by someone typing "yes" at a real keyboard. Run
+    /// through the agent, stdin is closed, so the subcommand would just read
+    /// EOF and cancel itself — instead of wasting that round trip, the gate
+    /// refuses it up front and points at the developer running it directly.
+    InteractiveOnly,
+}
+
+const PLEASE_INTERACTIVE_ONLY: &[&str] = &["discard", "purge", "revert", "squash"];
+
+fn please_risk(command: &str, args: &[String]) -> Risk {
+    match command {
+        "status" | "log" => Risk::ReadOnly,
+        "branch" if args.is_empty() => Risk::ReadOnly,
+        "stash" => match args.first().map(String::as_str) {
+            Some("list") => Risk::ReadOnly,
+            Some("drop") => Risk::InteractiveOnly,
+            _ => Risk::Mutating, // push (default) or pop
+        },
+        "sync" if args.first().map(String::as_str) == Some("exactly") => Risk::InteractiveOnly,
+        // A `switch` to a branch that already exists just switches; to one
+        // that doesn't, switch.rs asks "create it?" and reads stdin itself —
+        // checked here dynamically against real repo state, not guessed.
+        "switch" => match args.first() {
+            Some(name) if git::branch_exists(name) => Risk::Mutating,
+            _ => Risk::InteractiveOnly,
+        },
+        cmd if PLEASE_INTERACTIVE_ONLY.contains(&cmd) => Risk::InteractiveOnly,
+        _ => Risk::Mutating,
     }
 }
 
