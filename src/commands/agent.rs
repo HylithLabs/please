@@ -90,8 +90,8 @@ fn build_system_prompt(project_context: Option<&str>) -> String {
          drop, and switching to a branch that doesn't exist yet) can only be confirmed by \
          someone typing at a real keyboard — for those the tool tells you to have the developer \
          run it directly instead of retrying. To create a new branch, use `please branch \
-         <name>` (creates and switches, no confirmation needed) rather than `please switch \
-         <name>`.\n\n\
+         <name>` (confirmed once, then creates and switches) rather than `please switch \
+         <name>`, which the agent can't do at all if the branch doesn't already exist.\n\n\
          Work in as few tool calls as you need, and don't repeat a call you already made. Once \
          the task is done — or you can't do it and need to explain why — respond with plain \
          text and no further tool calls. That ends the conversation, so make it a real answer \
