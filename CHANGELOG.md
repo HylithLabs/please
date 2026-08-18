@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.1.8
+
+* Fixed `please update` always failing on Homebrew installs with "Can't check for updates: unable to load receipt" — Homebrew never writes the cargo-dist install receipt the updater looks for, so `please update` now detects a Homebrew install and runs `brew upgrade please` automatically instead
+
 ## Version 0.1.7
 
 * Overhauled the AI agent's permission system: every mutating `git`/`gh`/`please` action now asks for confirmation by default, replacing the old destructive-flag blocklist with a read-only allowlist so nothing risky slips through unflagged
