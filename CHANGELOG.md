@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.1.9
+
+* Added `please init` — runs `git init` if this directory isn't already a git repo, then eagerly generates `please.md`, the AI-written project description
+* Added `please clone <url>` — a plain, literal passthrough to `git clone`, no AI involved
+* Every other command now checks for a git repo up front and points at `please init` or `please clone` instead of leaking git's raw "fatal: not a git repository" error
+
 ## Version 0.1.8
 
 * Fixed `please update` always failing on Homebrew installs with "Can't check for updates: unable to load receipt" — Homebrew never writes the cargo-dist install receipt the updater looks for, so `please update` now detects a Homebrew install and runs `brew upgrade please` automatically instead
