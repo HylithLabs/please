@@ -10,6 +10,17 @@ pub fn run() {
     println!("  please \"<what you want to do>\"    run the AI agent on a plain-language request");
     println!("  please chat                       open an interactive AI session\n");
 
+    println!("REPOSITORY");
+    print_cmd(
+        "init",
+        "initialize a git repo here, and generate please.md",
+    );
+    print_cmd(
+        "clone <url>",
+        "clone a remote repository (plain `git clone`, no AI involved)",
+    );
+    println!();
+
     println!("AI");
     print_cmd(
         "commit",

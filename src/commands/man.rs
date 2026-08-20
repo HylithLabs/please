@@ -21,6 +21,12 @@ fn get_manual(cmd: &str) -> Option<&'static str> {
         "commit" => Some(
             "NAME\n    please commit - stage your changes, split into commits, and use AI-written messages\n\nDESCRIPTION\n    Stages your changes, sends the diff to the AI, and lets it split the work into one or more logically coherent commits — each with its own files and message. You never run `git add` or write a commit message yourself.\n\n    Guardrails run automatically before staging:\n    - Sensitive files (.env, credentials, private keys, etc.) are skipped unless you've already staged them yourself.\n    - Build/dependency directories (node_modules, dist, target, .venv, etc.) that aren't already tracked or ignored are added to .gitignore automatically.",
         ),
+        "init" => Some(
+            "NAME\n    please init - initialize a git repo and please.md\n\nDESCRIPTION\n    Runs `git init` if this directory isn't already a git repo, then eagerly generates please.md (the AI-generated project description please otherwise only creates lazily, the first time commit/chat/agent mode needs it). Needs an AI provider configured (`please setup`) to generate please.md; git init itself always runs regardless.",
+        ),
+        "clone" => Some(
+            "NAME\n    please clone - clone a remote repository\n\nSYNOPSIS\n    please clone <remote-url> [directory]\n\nDESCRIPTION\n    Runs `git clone` with the given arguments exactly as-is. No AI, no guardrails — a plain, literal passthrough.",
+        ),
         "push" => Some(
             "NAME\n    please push - commit and push to remote\n\nDESCRIPTION\n    Runs `please commit`, then pushes the current branch to `origin` (setting the upstream on first push).",
         ),

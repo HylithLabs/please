@@ -16,6 +16,8 @@ type CommandFn = fn(&[String]);
 /// Every literal `please` subcommand, normalized to `CommandFn`.
 const COMMANDS: &[(&str, CommandFn)] = &[
     ("config", commands::config_cmd::run),
+    ("init", |_| commands::init::run()),
+    ("clone", commands::clone::run),
     ("commit", |_| commands::commit::run()),
     ("push", |_| commands::push::run()),
     ("setup", |_| commands::setup::run()),
@@ -48,6 +50,14 @@ const COMMANDS: &[(&str, CommandFn)] = &[
 /// sentence untouched, since grammar matters there.
 const FILLER_WORDS: &[&str] = &["to", "into", "the", "a", "an"];
 
+/// Subcommands that don't need an existing git repo to make sense — either
+/// they set one up (`init`, `clone`), or they never touch git at all
+/// (`help`, `man`, `setup`, `config`, `alias`, `update`). Every other
+/// subcommand, and agent mode, assumes it's running inside a repo.
+const REPO_OPTIONAL: &[&str] = &[
+    "init", "clone", "help", "man", "setup", "config", "alias", "update",
+];
+
 /// Routes `please`'s own argv (everything after the binary name) to a
 /// literal subcommand on an exact or close-enough match, or to the AI agent
 /// as a plain-language request if nothing lines up.
@@ -62,24 +72,39 @@ pub fn route(words: &[String]) {
         return;
     }
 
-    if let Some(run) = exact_command(first).or_else(|| fuzzy_command(first)) {
+    if let Some((name, run)) = exact_command(first).or_else(|| fuzzy_command(first)) {
         let args = strip_filler(&words[1..]);
         if args.iter().any(|arg| arg == "-h" || arg == "--help") {
             commands::man::run(std::slice::from_ref(first));
             return;
         }
+        if !REPO_OPTIONAL.contains(&name) {
+            ensure_repo();
+        }
         run(&args);
         return;
     }
 
+    ensure_repo();
     commands::agent::run(&words.join(" "));
 }
 
-fn exact_command(word: &str) -> Option<CommandFn> {
+/// Exits with guidance instead of letting a bare git command leak its own
+/// raw "fatal: not a git repository" error onto the screen.
+fn ensure_repo() {
+    if crate::git::is_repo() {
+        return;
+    }
+    crate::ui::error("not a git repository yet.");
+    eprintln!("Run `please init` to start one here, or `please clone <url>` to grab an existing one.");
+    std::process::exit(1);
+}
+
+fn exact_command(word: &str) -> Option<(&'static str, CommandFn)> {
     COMMANDS
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(word))
-        .map(|(_, run)| *run)
+        .map(|&(name, run)| (name, run))
 }
 
 /// Matches a typo'd command word (single substitution, insertion, deletion,
@@ -87,11 +112,11 @@ fn exact_command(word: &str) -> Option<CommandFn> {
 /// than that risks hijacking a genuine sentence for the AI agent — "clean
 /// up my messy code" is two edits from "cleanup" and must NOT become
 /// `please cleanup`, so the threshold stays tight rather than generous.
-fn fuzzy_command(word: &str) -> Option<CommandFn> {
+fn fuzzy_command(word: &str) -> Option<(&'static str, CommandFn)> {
     const MAX_DISTANCE: usize = 1;
     let word = word.to_lowercase();
 
-    let mut best: Option<(usize, CommandFn)> = None;
+    let mut best: Option<(usize, &'static str, CommandFn)> = None;
     let mut ambiguous = false;
 
     for &(name, run) in COMMANDS {
@@ -100,12 +125,12 @@ fn fuzzy_command(word: &str) -> Option<CommandFn> {
             continue;
         }
         match best {
-            None => best = Some((distance, run)),
-            Some((best_distance, _)) if distance < best_distance => {
-                best = Some((distance, run));
+            None => best = Some((distance, name, run)),
+            Some((best_distance, _, _)) if distance < best_distance => {
+                best = Some((distance, name, run));
                 ambiguous = false;
             }
-            Some((best_distance, _)) if distance == best_distance => ambiguous = true,
+            Some((best_distance, _, _)) if distance == best_distance => ambiguous = true,
             _ => {}
         }
     }
@@ -113,7 +138,7 @@ fn fuzzy_command(word: &str) -> Option<CommandFn> {
     if ambiguous {
         None
     } else {
-        best.map(|(_, run)| run)
+        best.map(|(_, name, run)| (name, run))
     }
 }
 

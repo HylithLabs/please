@@ -118,6 +118,35 @@ pub fn is_ignored(path: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// True if the current directory is inside a git working tree. `.output()`,
+/// not `.status()`: outside a repo, git writes "fatal: not a git
+/// repository..." to stderr, and inheriting that straight to the terminal is
+/// exactly the raw, confusing failure `please init`'s guidance is meant to
+/// replace.
+pub fn is_repo() -> bool {
+    Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+pub fn init() -> Result<(), String> {
+    run_ok(&["init"])
+}
+
+/// Runs `git clone` with args forwarded straight through (remote URL, and
+/// optionally a target directory or any other git-clone flags), with
+/// inherited stdio so git's own clone progress prints live.
+pub fn clone(args: &[String]) -> bool {
+    Command::new("git")
+        .arg("clone")
+        .args(args)
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
 pub fn current_branch() -> String {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])

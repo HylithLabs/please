@@ -39,6 +39,12 @@ Powered by Anthropic Claude, Google Gemini, or OpenAI ChatGPT, it handles the te
 
 .SS "Core Workflow"
 .TP
+.B please init
+Runs \fBgit init\fR if this directory isn't already a git repo, then eagerly generates please.md.
+.TP
+.B please clone \fI<remote-url>\fR \fI[directory]\fR
+Runs \fBgit clone\fR with the given arguments exactly as-is. No AI, no guardrails.
+.TP
 .B please commit
 Analyzes your working tree, skips secrets/junk, stages changes, and uses AI to split your work into logically coherent, beautifully written commits.
 .TP
