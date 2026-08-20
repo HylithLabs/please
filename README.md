@@ -1,6 +1,5 @@
 <div align="center">
     <img src="./src/assets/logo.png" width="175px" alt="please">
-<h1>Please</h1>
 </div>
 
 <h3 align="center">An AI native git CLI, built so you never have to type a raw git command again.</h3>
@@ -27,7 +26,7 @@
 
 ## Table of Contents
 
-* [Demonstration](#demo)
+* [Demonstration](#demonstration)
 * [Introduction](#introduction)
   * [Documentation](#documentation)
 * [Install](#install)
