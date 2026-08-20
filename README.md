@@ -124,7 +124,3 @@ If you discover a security vulnerability, please do not open a public issue. See
 ## License
 
 Please is published under the [Apache 2.0 license](LICENSE).
-
-<p align="center">
-  <img src="./src/assets/demo.gif" alt="Please Demo">
-</p>
