@@ -27,10 +27,7 @@
 
 ## Table of Contents
 
-<p align="center">
-  <img src="./src/assets/demo.gif" alt="Please Demo">
-</p>
-
+* [Demonstration](#demo)
 * [Introduction](#introduction)
   * [Documentation](#documentation)
 * [Install](#install)
@@ -41,6 +38,12 @@
 * [Security](#security)
 * [License](#license)
 
+## Demonstration
+
+<p align="center">
+  <img src="./src/assets/demo.gif" alt="Please Demo">
+</p>
+
 ## Introduction
 
 Please is an AI native interface for git, built to remove the friction of remembering and typing raw git commands by hand. Instead of composing git (and gh) commands yourself, you describe an intent through a please command, and an AI agent of your choosing (Anthropic Claude, Google Gemini, or OpenAI ChatGPT) handles staging, commit messages, branching, and pushing on your behalf.
@@ -50,6 +53,8 @@ Git remains the engine underneath. Please is simply the interface placed on top 
 Please is forgiving by design. Typos and filler words do not block a command: `please swich to master` still runs `please switch master`. A mistyped command word is recognized when it is one edit away from a real command and is not also close to some other command, and small connector words such as "to", "into", "the", "a", and "an" are dropped before the real argument is passed through. Anything looser than that is intentionally left alone and handed to the AI agent instead, so a request like "clean up my messy code" prompts the AI to review your code rather than silently running `please cleanup` and deleting branches.
 
 Run `please` with no arguments, or `please help`, at any time for a full, grouped command reference directly in your terminal.
+
+
 
 ### Documentation
 
