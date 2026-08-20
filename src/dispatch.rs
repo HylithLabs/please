@@ -96,7 +96,9 @@ fn ensure_repo() {
         return;
     }
     crate::ui::error("not a git repository yet.");
-    eprintln!("Run `please init` to start one here, or `please clone <url>` to grab an existing one.");
+    eprintln!(
+        "Run `please init` to start one here, or `please clone <url>` to grab an existing one."
+    );
     std::process::exit(1);
 }
 

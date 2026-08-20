@@ -11,10 +11,7 @@ pub fn run() {
     println!("  please chat                       open an interactive AI session\n");
 
     println!("REPOSITORY");
-    print_cmd(
-        "init",
-        "initialize a git repo here, and generate please.md",
-    );
+    print_cmd("init", "initialize a git repo here, and generate please.md");
     print_cmd(
         "clone <url>",
         "clone a remote repository (plain `git clone`, no AI involved)",
