@@ -27,6 +27,12 @@ fn get_manual(cmd: &str) -> Option<&'static str> {
         "clone" => Some(
             "NAME\n    please clone - clone a remote repository\n\nSYNOPSIS\n    please clone <remote-url> [directory]\n\nDESCRIPTION\n    Runs `git clone` with the given arguments exactly as-is. No AI, no guardrails — a plain, literal passthrough.",
         ),
+        "github" => Some(
+            "NAME\n    please github - initialize and publish a project\n\nSYNOPSIS\n    please github [github-origin-url]\n\nDESCRIPTION\n    Initializes Git, switches to `main`, creates `first commit` when needed, configures `origin`, and pushes the project. An origin URL is optional when origin already exists.",
+        ),
+        "change" => Some(
+            "NAME\n    please change origin - move a repository to another origin\n\nSYNOPSIS\n    please change origin <url>\n    please change origin and push <url>\n\nDESCRIPTION\n    Changes the `origin` remote. The `and push` form also publishes all local branches and tags, preserving the repository's existing commit history.",
+        ),
         "push" => Some(
             "NAME\n    please push - commit and push to remote\n\nDESCRIPTION\n    Runs `please commit`, then pushes the current branch to `origin` (setting the upstream on first push).",
         ),
@@ -43,7 +49,7 @@ fn get_manual(cmd: &str) -> Option<&'static str> {
             "NAME\n    please sync - fetch and merge from upstream\n\nSYNOPSIS\n    please sync\n    please sync exactly\n\nDESCRIPTION\n    Fetches and merges the current branch's upstream in (like `git pull`). Reports \"up to date\" or the merge result; on a real conflict, shows git's conflict output and points you to `please commit` once you've resolved it.\n\n    `please sync exactly`:\n    Makes the local branch match its remote exactly — discards local commits and uncommitted changes not on the remote. Destructive, so it requires typing `yes` to proceed.",
         ),
         "undo" => Some(
-            "NAME\n    please undo - undo the last commit\n\nDESCRIPTION\n    Undoes the last commit — replaces `git reset --soft HEAD~1` — leaving its changes back in your working tree so you can fix them and try again.",
+            "NAME\n    please undo - undo the last commit\n\nSYNOPSIS\n    please undo\n    please undo --preview\n\nDESCRIPTION\n    Previews or undoes the last commit. Undo leaves its changes in the working tree; use `please recover` for recent commit history and `please recover changes` for a safety stash created by discard.",
         ),
         "redo" => Some(
             "NAME\n    please redo - redo the undone commit\n\nDESCRIPTION\n    Brings back the undone commit, as long as history hasn't moved on since (a new commit invalidates it).",
@@ -86,6 +92,12 @@ fn get_manual(cmd: &str) -> Option<&'static str> {
         ),
         "setup" => Some(
             "NAME\n    please setup - configure AI providers and API keys\n\nDESCRIPTION\n    Configure AI providers and API keys, switch between saved ones, and change the model used.",
+        ),
+        "doctor" => Some(
+            "NAME\n    please doctor - diagnose repository and provider health\n\nDESCRIPTION\n    Checks Git availability and age, repository state, remotes, detached HEAD, merge conflicts, uncommitted work, and the active AI provider. It only reports safe fixes and never changes your repository.",
+        ),
+        "review" => Some(
+            "NAME\n    please review - AI-review current changes\n\nDESCRIPTION\n    Sends the current tracked working-tree diff to the configured AI provider, which summarizes the change, identifies bugs or suspicious modifications, and suggests focused tests before you commit.",
         ),
         "update" => Some(
             "NAME\n    please update - update please itself\n\nSYNOPSIS\n    please update\n    please update ignore\n\nDESCRIPTION\n    Updates `please` itself to the latest release in place, no reinstalling by hand.\n\n    If `please update ignore` is used, it hides the current update notification and prevents it from appearing again until an even newer version is released.",

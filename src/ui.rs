@@ -55,6 +55,11 @@ pub fn success(message: &str) {
     println!("{} {}", green_bold("done"), message);
 }
 
+/// A concise suggested next action, shown after a command completes.
+pub fn tip(message: &str) {
+    println!("{} {}", green_bold("Next:"), message);
+}
+
 /// A file (or other) line under a success/step message, indented and muted
 /// so it reads as detail rather than another headline.
 pub fn detail(message: &str) {

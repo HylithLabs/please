@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::git;
 use crate::llm;
 
-fn context_path() -> PathBuf {
+pub fn context_path() -> PathBuf {
     PathBuf::from(".git").join("PLEASE.MD")
 }
 

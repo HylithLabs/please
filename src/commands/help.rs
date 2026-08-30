@@ -13,6 +13,18 @@ pub fn run() {
     println!("REPOSITORY");
     print_cmd("init", "initialize a git repo here, and generate please.md");
     print_cmd(
+        "github [url]",
+        "initialize, commit, and publish this project to GitHub",
+    );
+    print_cmd(
+        "change origin <url>",
+        "change the remote origin without pushing",
+    );
+    print_cmd(
+        "change origin and push <url>",
+        "change origin and push all branches and tags",
+    );
+    print_cmd(
         "clone <url>",
         "clone a remote repository (plain `git clone`, no AI involved)",
     );
@@ -31,6 +43,10 @@ pub fn run() {
         "setup",
         "configure AI providers and API keys, switch between saved ones",
     );
+    print_cmd(
+        "review",
+        "AI-review the current changes and suggest focused tests",
+    );
     println!();
 
     println!("BRANCHING & SYNC");
@@ -38,6 +54,7 @@ pub fn run() {
         "status",
         "where you stand: branch, ahead/behind, what's changed",
     );
+    print_cmd("doctor", "diagnose Git, repository, and AI setup problems");
     print_cmd(
         "branch [name]",
         "list branches, or create and switch to a new one",
@@ -53,7 +70,18 @@ pub fn run() {
     println!();
 
     println!("UNDO & RECOVERY");
-    print_cmd("undo / redo", "undo the last commit, or bring it back");
+    print_cmd(
+        "undo / redo",
+        "preview/undo the last commit, or bring it back",
+    );
+    print_cmd(
+        "recover [changes]",
+        "recover a recent commit or discarded changes",
+    );
+    print_cmd(
+        "context [--refresh]",
+        "inspect or regenerate project context",
+    );
     print_cmd(
         "move-commit <branch>",
         "move your last commit onto a new branch",
@@ -88,6 +116,7 @@ pub fn run() {
         "rename the current branch, remote included",
     );
     print_cmd("cleanup", "delete local branches already merged");
+    print_cmd("start \"purpose\"", "create a purpose-named feature branch");
     println!();
 
     println!("HISTORY");
@@ -95,6 +124,15 @@ pub fn run() {
     print_cmd(
         "purge <path>",
         "permanently remove a file or folder from all git history",
+    );
+    print_cmd("resolve", "explain and resolve merge conflicts with AI");
+    print_cmd(
+        "split / reorder / combine",
+        "organize commits with AI assistance",
+    );
+    print_cmd(
+        "release",
+        "draft release notes and a version from recent commits",
     );
     println!();
 
