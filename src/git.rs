@@ -28,6 +28,92 @@ pub fn diff_staged() -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+/// The complete tracked working-tree diff, including staged and unstaged
+/// changes. `HEAD` makes the command useful regardless of staging state.
+pub fn diff_head() -> String {
+    let mut diff = Command::new("git")
+        .args(["diff", "HEAD", "--"])
+        .output()
+        .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+        .unwrap_or_default();
+
+    // `git diff` does not include untracked files. Include readable ones so
+    // review sees the same work the developer sees, without staging anything.
+    for (code, path) in status_entries() {
+        if code == "??" {
+            let output = Command::new("git")
+                .args(["diff", "--no-index", "--", "NUL", &path])
+                .output();
+            if let Ok(output) = output {
+                let text = String::from_utf8_lossy(&output.stdout);
+                if !text.is_empty() {
+                    diff.push_str(&text);
+                    diff.push('\n');
+                }
+            }
+        }
+    }
+    diff
+}
+
+pub fn git_version() -> Option<(u32, u32, u32, String)> {
+    let output = Command::new("git").args(["--version"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let version = text.strip_prefix("git version ")?;
+    let mut parts = version.split('.');
+    Some((
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts
+            .next()
+            .and_then(|p| p.split(|c: char| !c.is_ascii_digit()).next())
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(0),
+        text,
+    ))
+}
+
+pub fn remote_names() -> Vec<String> {
+    Command::new("git")
+        .args(["remote"])
+        .output()
+        .ok()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+pub fn reflog() -> Vec<(String, String)> {
+    Command::new("git")
+        .args(["reflog", "--date=short", "--format=%h|%gd|%gs"])
+        .output()
+        .ok()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter_map(|line| {
+                    let mut p = line.splitn(3, '|');
+                    Some((
+                        format!("{} {}", p.next()?, p.next()?),
+                        p.next()?.to_string(),
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+pub fn create_branch_at(name: &str, reference: &str) -> Result<(), String> {
+    run_ok(&["branch", name, reference])
+}
+
 pub fn list_tracked_files() -> String {
     let output = Command::new("git")
         .args(["ls-files"])
@@ -133,6 +219,18 @@ pub fn is_repo() -> bool {
 
 pub fn init() -> Result<(), String> {
     run_ok(&["init"])
+}
+
+pub fn set_branch(name: &str) -> Result<(), String> {
+    run_ok(&["branch", "-M", name])
+}
+
+pub fn has_commits() -> bool {
+    Command::new("git")
+        .args(["rev-parse", "--verify", "-q", "HEAD"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 /// Runs `git clone` with args forwarded straight through (remote URL, and
@@ -684,6 +782,26 @@ pub fn has_remote(name: &str) -> bool {
 
 pub fn add_remote(name: &str, url: &str) -> Result<(), String> {
     run_ok(&["remote", "add", name, url])
+}
+
+pub fn set_remote_url(name: &str, url: &str) -> Result<(), String> {
+    run_ok(&["remote", "set-url", name, url])
+}
+
+pub fn push_all_history() -> bool {
+    let branches = Command::new("git")
+        .args(["push", "origin", "--all"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+
+    let tags = Command::new("git")
+        .args(["push", "origin", "--tags"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+
+    branches && tags
 }
 
 /// True if any commit, on any branch, ever touched `path` — including ones

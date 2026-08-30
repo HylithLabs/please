@@ -16,28 +16,40 @@ type CommandFn = fn(&[String]);
 /// Every literal `please` subcommand, normalized to `CommandFn`.
 const COMMANDS: &[(&str, CommandFn)] = &[
     ("config", commands::config_cmd::run),
+    ("github", commands::github::run),
+    ("change", commands::change_origin::run),
     ("init", |_| commands::init::run()),
     ("clone", commands::clone::run),
     ("commit", |_| commands::commit::run()),
     ("push", |_| commands::push::run()),
     ("setup", |_| commands::setup::run()),
     ("status", |_| commands::status::run()),
+    ("doctor", commands::doctor::run),
+    ("review", |_| commands::review::run()),
+    ("resolve", |_| commands::resolve::run()),
+    ("recover", commands::recover::run),
+    ("start", commands::start::run),
+    ("split", |_| commands::split::run()),
+    ("reorder", |_| commands::reorder::run()),
+    ("combine", |_| commands::combine::run()),
+    ("release", |_| commands::release::run()),
+    ("context", commands::context_cmd::run),
     ("branch", commands::branch::run),
     ("switch", commands::switch::run),
     ("sync", commands::sync::run),
-    ("undo", |_| commands::undo::run()),
+    ("undo", commands::undo::run),
     ("redo", |_| commands::redo::run()),
     ("move-commit", commands::move_commit::run),
     ("discard", |_| commands::discard::run()),
     ("restore", commands::restore::run),
     ("rename", commands::rename::run),
-    ("cleanup", |_| commands::cleanup::run()),
+    ("cleanup", commands::cleanup::run),
     ("log", |_| commands::log::run()),
     ("revert", |_| commands::revert::run()),
     ("stash", commands::stash::run),
     ("squash", commands::squash::run),
     ("purge", commands::purge::run),
-    ("chat", |_| commands::chat::run()),
+    ("chat", commands::chat::run),
     ("alias", commands::alias::run),
     ("man", commands::man::run),
     ("help", |_| commands::help::run()),
@@ -48,14 +60,18 @@ const COMMANDS: &[(&str, CommandFn)] = &[
 /// argument, e.g. the "to" in "switch to master". Stripped only when we're
 /// about to run a literal subcommand — the AI agent gets the original
 /// sentence untouched, since grammar matters there.
-const FILLER_WORDS: &[&str] = &["to", "into", "the", "a", "an"];
+// Only strip the connective used by natural-language forms such as
+// `please switch to feature/x`. Other words can be meaningful command
+// arguments, especially branch purposes and URLs.
+const FILLER_WORDS: &[&str] = &["to"];
 
 /// Subcommands that don't need an existing git repo to make sense — either
-/// they set one up (`init`, `clone`), or they never touch git at all
-/// (`help`, `man`, `setup`, `config`, `alias`, `update`). Every other
-/// subcommand, and agent mode, assumes it's running inside a repo.
+/// they set one up (`init`, `clone`), never touch git at all, or provide a
+/// general-purpose AI conversation (`chat`). Every other subcommand assumes
+/// it's running inside a repo.
 const REPO_OPTIONAL: &[&str] = &[
-    "init", "clone", "help", "man", "setup", "config", "alias", "update",
+    "init", "clone", "github", "help", "man", "setup", "config", "alias", "chat", "update",
+    "doctor",
 ];
 
 /// Routes `please`'s own argv (everything after the binary name) to a
@@ -85,7 +101,6 @@ pub fn route(words: &[String]) {
         return;
     }
 
-    ensure_repo();
     commands::agent::run(&words.join(" "));
 }
 

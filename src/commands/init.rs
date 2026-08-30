@@ -6,7 +6,7 @@ use crate::ui;
 /// Sets up a fresh repo for `please`: `git init` if one isn't already there,
 /// then an eager attempt at `please.md` (the AI-generated project
 /// description `please` otherwise only generates lazily, the first time
-/// `commit`/`chat`/agent mode needs it).
+/// `commit`/agent mode needs it).
 pub fn run() {
     if git::is_repo() {
         ui::warn("already a git repository, nothing to initialize there.");

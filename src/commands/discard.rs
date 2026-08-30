@@ -23,6 +23,9 @@ pub fn run() {
         return;
     }
 
+    // Keep a recoverable safety copy before removing anything from the tree.
+    let _ = git::stash_push();
+
     if let Err(err) = git::reset_hard_head() {
         eprintln!("Failed to discard tracked changes: {err}");
         std::process::exit(1);

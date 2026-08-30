@@ -6,6 +6,7 @@ use crate::llm;
 use crate::sensitive;
 
 pub fn run() {
+    let test_result = run_project_checks();
     gitignore::ensure_junk_ignored();
 
     let already_staged = git::staged_files();
@@ -63,7 +64,10 @@ pub fn run() {
                 }
 
                 if crate::dispatch::wants_feedback() {
-                    let msg = format!("Commit with message: '{}'?", group.message.trim());
+                    let msg = format!(
+                        "Commit with message: '{}'? Tests: {test_result}",
+                        group.message.trim()
+                    );
                     if !crate::ui::confirm(&msg) {
                         crate::ui::warn("Skipped commit.");
                         continue;
@@ -94,5 +98,25 @@ pub fn run() {
             crate::ui::error(&format!("failed to plan commits: {err}"));
             std::process::exit(1);
         }
+    }
+}
+
+fn run_project_checks() -> String {
+    let (program, args, label) = if std::path::Path::new("Cargo.toml").exists() {
+        ("cargo", vec!["test"], "cargo test")
+    } else if std::path::Path::new("package.json").exists() {
+        ("npm", vec!["test"], "npm test")
+    } else if std::path::Path::new("pyproject.toml").exists() {
+        ("python", vec!["-m", "pytest"], "pytest")
+    } else if std::path::Path::new("Makefile").exists() {
+        ("make", vec!["test"], "make test")
+    } else {
+        return "not detected".to_string();
+    };
+    println!("Running {label} before planning commits...");
+    match std::process::Command::new(program).args(args).status() {
+        Ok(status) if status.success() => format!("{label} passed"),
+        Ok(_) => format!("{label} failed"),
+        Err(err) => format!("{label} unavailable ({err})"),
     }
 }

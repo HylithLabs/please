@@ -8,6 +8,7 @@ mod git;
 mod gitignore;
 mod llm;
 mod sensitive;
+mod tips;
 mod ui;
 mod update_checker;
 
@@ -26,6 +27,8 @@ fn main() {
     let is_update = args.get(1).map(|s| s.as_str()) == Some("update");
 
     dispatch::route(&args[1..]);
+
+    tips::show(&args[1..]);
 
     if !is_update {
         update_checker::check_and_notify();

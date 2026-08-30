@@ -61,6 +61,14 @@ pub(crate) fn prepare_session() -> (Config, String, Vec<ToolSpec>) {
 /// every request — see [`prepare_session`] for why this stays separate
 /// instead of being folded in once.
 pub(crate) fn dynamic_state() -> String {
+    if !git::is_repo() {
+        return "\n\nNo Git repository is initialized in the current location. You can still answer \
+                general questions and have a conversation. If the developer asks for a Git \
+                operation, explain that they need to run `please init` or move into a repository \
+                first."
+            .to_string();
+    }
+
     let mut state = format!("\n\nCurrent branch: {}", git::current_branch());
     match git::upstream_branch() {
         Some(upstream) => state.push_str(&format!(" (tracking {upstream})")),
@@ -103,6 +111,11 @@ fn build_system_prompt(project_context: Option<&str>) -> String {
         prompt.push_str(context);
     }
 
+    if let Ok(instructions) = std::fs::read_to_string(".please/instructions.md") {
+        prompt.push_str("\n\nProject instructions (follow these conventions):\n");
+        prompt.push_str(&instructions);
+    }
+
     prompt
 }
 
@@ -137,7 +150,9 @@ fn tool_specs() -> Vec<ToolSpec> {
                         "enum": [
                             "status", "branch", "switch", "sync", "undo", "redo",
                             "move-commit", "discard", "restore", "rename", "cleanup", "log",
-                            "revert", "stash", "purge", "squash", "commit", "push", "update"
+                            "revert", "stash", "purge", "squash", "commit", "push", "update",
+                            "doctor", "review", "resolve", "recover", "start", "split", "reorder", "combine",
+                            "release", "context"
                         ]
                     },
                     "args": { "type": "array", "items": { "type": "string" } }

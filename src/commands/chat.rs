@@ -8,7 +8,24 @@ use crate::llm;
 /// tools and system prompt, but the conversation stays alive across
 /// messages instead of starting over each time — so a follow-up like "now
 /// undo that" or "why did it fail" actually has something to refer to.
-pub fn run() {
+pub fn run(args: &[String]) {
+    if args.iter().any(|a| a == "--last") {
+        let mut files: Vec<_> = std::fs::read_dir(".please/history")
+            .ok()
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .collect();
+        files.sort_by_key(|e| e.file_name());
+        if let Some(file) = files.last() {
+            if let Ok(text) = std::fs::read_to_string(file.path()) {
+                println!("{text}");
+            }
+        } else {
+            println!("No saved conversations yet.");
+        }
+        return;
+    }
     let (cfg, base_prompt, tools) = agent::prepare_session();
     let mut session = llm::AgentSession::new();
 
@@ -49,6 +66,22 @@ pub fn run() {
         match session.send(input, &cfg, &system_prompt, &tools, agent::execute_tool) {
             Ok(text) => {
                 crate::ui::print_markdown(&text);
+                if let Err(err) = std::fs::create_dir_all(".please/history") {
+                    eprintln!("Could not save conversation history: {err}");
+                    println!();
+                    continue;
+                }
+                let stamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let safe = input.replace('\n', " ");
+                if let Err(err) = std::fs::write(
+                    format!(".please/history/{stamp}.md"),
+                    format!("# {safe}\n\n{text}\n"),
+                ) {
+                    eprintln!("Could not save conversation history: {err}");
+                }
                 println!();
             }
             Err(err) => eprintln!("Agent failed: {err}\n"),
