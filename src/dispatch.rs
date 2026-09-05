@@ -104,17 +104,30 @@ pub fn route(words: &[String]) {
     commands::agent::run(&words.join(" "));
 }
 
-/// Exits with guidance instead of letting a bare git command leak its own
-/// raw "fatal: not a git repository" error onto the screen.
+/// Offers to `git init` right there instead of just refusing. A developer
+/// typing `please status`/`please branch`/etc. in a plain folder almost
+/// always wants a repo, not a lecture and a dead end. Asking once and
+/// getting on with it beats a flat "not a git repository" that reads like
+/// `please` is broken. Declining exits cleanly instead of continuing into a
+/// subcommand that assumes a repo exists.
 fn ensure_repo() {
     if crate::git::is_repo() {
         return;
     }
-    crate::ui::error("not a git repository yet.");
-    eprintln!(
-        "Run `please init` to start one here, or `please clone <url>` to grab an existing one."
-    );
-    std::process::exit(1);
+
+    if !crate::ui::confirm("This folder isn't a Git repository yet. Initialize one here?") {
+        crate::ui::warn(
+            "Okay, not initializing. This command needs a Git repository to run. \
+             `please clone <url>` works too if you meant to grab an existing one.",
+        );
+        std::process::exit(1);
+    }
+
+    if let Err(err) = crate::git::init() {
+        crate::ui::error(&format!("failed to initialize Git: {err}"));
+        std::process::exit(1);
+    }
+    crate::ui::success("Initialized a Git repository.");
 }
 
 fn exact_command(word: &str) -> Option<(&'static str, CommandFn)> {
