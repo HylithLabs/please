@@ -1,8 +1,10 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::llm::RunPlan;
-use crate::{config, llm, ui};
+use crate::{config, git, llm, ui};
 
 /// The only files the model ever sees for `please run`. An allowlist, not a
 /// blocklist: `.env` and friends are simply never candidates, rather than
@@ -24,11 +26,23 @@ const MANIFEST_FILES: &[&str] = &[
 
 const MAX_MANIFEST_LEN: usize = 8000;
 
-/// `.git/please/run.json`, not the working tree: which command starts a
-/// project is machine-specific bookkeeping, not something to commit or stare
-/// at in `git status`.
+/// `.git/please/run.json` when a repo already exists, never the working
+/// tree. `please run` works outside a repo too (running a project has
+/// nothing to do with git), and must not create a `.git` folder just to
+/// have somewhere to write a cache file, so a plain folder gets a global
+/// cache instead, keyed by its path, under the same home directory
+/// `please`'s own config already lives in.
 fn cache_path() -> PathBuf {
-    Path::new(".git").join("please").join("run.json")
+    if git::is_repo() {
+        return Path::new(".git").join("please").join("run.json");
+    }
+
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let mut hasher = DefaultHasher::new();
+    cwd.hash(&mut hasher);
+    config::config_dir()
+        .join("run-cache")
+        .join(format!("{:x}.json", hasher.finish()))
 }
 
 pub fn run(args: &[String]) {
