@@ -1,6 +1,6 @@
 [package]
 name = "please"
-version = "0.2.0"
+version = "2.0.0"
 edition = "2024"
 authors = ["Raiyan Bin Rashid <raiyanbinrashid0@gmail.com>"]
 description = "An AI-native git CLI. You never type raw git commands."
