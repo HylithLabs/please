@@ -4,13 +4,20 @@ use std::io::{self, Write};
 use crate::commands::agent;
 use crate::llm;
 
+/// Where saved conversations live: `.git/please/history`, not a working-tree
+/// `.please/` folder — this is local scratch, not something a developer
+/// wants staring back at them in `git status` or accidentally committed.
+fn history_dir() -> std::path::PathBuf {
+    std::path::Path::new(".git").join("please").join("history")
+}
+
 /// An interactive, multi-turn version of `please "<prompt>"`: the same
 /// tools and system prompt, but the conversation stays alive across
 /// messages instead of starting over each time — so a follow-up like "now
 /// undo that" or "why did it fail" actually has something to refer to.
 pub fn run(args: &[String]) {
     if args.iter().any(|a| a == "--last") {
-        let mut files: Vec<_> = std::fs::read_dir(".please/history")
+        let mut files: Vec<_> = std::fs::read_dir(history_dir())
             .ok()
             .into_iter()
             .flatten()
@@ -66,18 +73,20 @@ pub fn run(args: &[String]) {
         match session.send(input, &cfg, &system_prompt, &tools, agent::execute_tool) {
             Ok(text) => {
                 crate::ui::print_markdown(&text);
-                if let Err(err) = std::fs::create_dir_all(".please/history") {
+                if let Err(err) = std::fs::create_dir_all(history_dir()) {
                     eprintln!("Could not save conversation history: {err}");
                     println!();
                     continue;
                 }
+                // Millis, not secs: two turns can easily land in the same
+                // second and a coarser stamp would silently overwrite one.
                 let stamp = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
+                    .map(|d| d.as_millis())
                     .unwrap_or(0);
                 let safe = input.replace('\n', " ");
                 if let Err(err) = std::fs::write(
-                    format!(".please/history/{stamp}.md"),
+                    history_dir().join(format!("{stamp}.md")),
                     format!("# {safe}\n\n{text}\n"),
                 ) {
                     eprintln!("Could not save conversation history: {err}");

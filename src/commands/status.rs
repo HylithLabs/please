@@ -16,7 +16,6 @@ pub fn run() {
     };
     let noun = if entries.len() == 1 { "file" } else { "files" };
     println!("Branch {branch}: {} {noun} changed, {sync}.", entries.len());
-    println!("Tests have not been run.");
     if !entries.is_empty() {
         println!("\nChanges:");
         for (code, path) in &entries {

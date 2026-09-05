@@ -1,4 +1,4 @@
-use crate::{git, ui};
+use crate::{git, gitignore, sensitive, ui};
 
 /// Initializes and publishes a local project to its GitHub origin. A URL is
 /// optional when an origin already exists; it is required for a brand-new
@@ -52,7 +52,21 @@ pub fn run(args: &[String]) {
     }
 
     if !git::has_commits() {
+        // Same safety net `please commit` gives every other commit: a brand
+        // new project is exactly where a stray `.env` or `node_modules/`
+        // is most likely to be sitting around, and this is about to push
+        // whatever gets committed here straight to GitHub.
+        gitignore::ensure_junk_ignored();
         git::stage_all();
+        for file in git::staged_files() {
+            if sensitive::is_sensitive(&file) {
+                git::unstage_file(&file);
+                ui::warn(&format!(
+                    "skipped staging '{file}', looks like a secret/credential file. \
+                     Run `git add {file}` yourself first if you want it included."
+                ));
+            }
+        }
         if git::staged_files().is_empty() || !git::commit("first commit") {
             ui::error("could not create the first commit; make sure the project contains files.");
             std::process::exit(1);

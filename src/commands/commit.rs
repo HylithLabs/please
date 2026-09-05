@@ -6,7 +6,6 @@ use crate::llm;
 use crate::sensitive;
 
 pub fn run() {
-    let test_result = run_project_checks();
     gitignore::ensure_junk_ignored();
 
     let already_staged = git::staged_files();
@@ -49,6 +48,11 @@ pub fn run() {
             }
             let _ = config::save(&cfg);
 
+            // Only worth running when a human will actually see the result —
+            // in `--yes`/scripted mode nobody reads it, so don't make every
+            // commit pay for a full test run.
+            let test_result = crate::dispatch::wants_feedback().then(run_project_checks);
+
             let total = outcome.commits.len();
             for (index, group) in outcome.commits.into_iter().enumerate() {
                 if !git::stage_files(&group.files) {
@@ -63,7 +67,7 @@ pub fn run() {
                     crate::ui::step(&format!("Commit {}/{total}", index + 1));
                 }
 
-                if crate::dispatch::wants_feedback() {
+                if let Some(test_result) = &test_result {
                     let msg = format!(
                         "Commit with message: '{}'? Tests: {test_result}",
                         group.message.trim()

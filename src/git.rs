@@ -39,10 +39,11 @@ pub fn diff_head() -> String {
 
     // `git diff` does not include untracked files. Include readable ones so
     // review sees the same work the developer sees, without staging anything.
+    let null_device = if cfg!(windows) { "NUL" } else { "/dev/null" };
     for (code, path) in status_entries() {
         if code == "??" {
             let output = Command::new("git")
-                .args(["diff", "--no-index", "--", "NUL", &path])
+                .args(["diff", "--no-index", "--", null_device, &path])
                 .output();
             if let Ok(output) = output {
                 let text = String::from_utf8_lossy(&output.stdout);
@@ -139,17 +140,22 @@ pub fn staged_files() -> Vec<String> {
         .collect()
 }
 
+/// `reset --`, not `restore --staged --`: `restore` needs `HEAD` to resolve
+/// as its default source and hard-fails with "could not resolve HEAD" on a
+/// repo with no commits yet — exactly the moment a secret-file check on a
+/// fresh `please github`/`please commit` most needs to actually work.
+/// `reset` handles the unborn case natively and is otherwise identical.
 pub fn unstage_file(path: &str) {
     let _ = Command::new("git")
-        .args(["restore", "--staged", "--", path])
+        .args(["reset", "--quiet", "--", path])
         .status();
 }
 
 pub fn unstage_all() {
     let status = Command::new("git")
-        .args(["restore", "--staged", "."])
+        .args(["reset", "--quiet"])
         .status()
-        .expect("failed to run git restore --staged .");
+        .expect("failed to run git reset");
 
     if !status.success() {
         eprintln!("failed to unstage changes");
@@ -246,6 +252,20 @@ pub fn clone(args: &[String]) -> bool {
 }
 
 pub fn current_branch() -> String {
+    // `rev-parse --abbrev-ref HEAD` needs HEAD to resolve to a commit, so it
+    // fails on a fresh repo with no commits yet (an "unborn" branch).
+    // `symbolic-ref` reads the branch name straight off the ref itself and
+    // works either way; it only fails on a genuinely detached HEAD, which
+    // falls through to the rev-parse form below.
+    let output = Command::new("git")
+        .args(["symbolic-ref", "--quiet", "--short", "HEAD"])
+        .output()
+        .expect("failed to run git symbolic-ref --short HEAD");
+
+    if output.status.success() {
+        return String::from_utf8_lossy(&output.stdout).trim().to_string();
+    }
+
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()

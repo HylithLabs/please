@@ -20,8 +20,6 @@ pub fn run(args: &[String]) {
     let name = format!("feature/{slug}");
     match git::create_and_switch_branch(&name) {
         Ok(()) => {
-            let _ = std::fs::create_dir_all(".please");
-            let _ = std::fs::write(".please/branch-purpose", &purpose);
             println!("Created '{name}'. Purpose: {purpose}");
         }
         Err(err) => {

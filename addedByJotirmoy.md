@@ -64,7 +64,7 @@ Detects common test setups such as Cargo, npm, pytest, and Makefile projects. Te
 please start "add dark mode"
 ```
 
-Creates a purpose-based feature branch, such as `feature/add-dark-mode`, and records the branch purpose locally.
+Creates a purpose-based feature branch, such as `feature/add-dark-mode`.
 
 ```terminal
 please cleanup --preview
