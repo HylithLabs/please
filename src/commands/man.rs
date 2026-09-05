@@ -99,6 +99,9 @@ fn get_manual(cmd: &str) -> Option<&'static str> {
         "review" => Some(
             "NAME\n    please review - AI-review current changes\n\nDESCRIPTION\n    Sends the current tracked working-tree diff to the configured AI provider, which summarizes the change, identifies bugs or suspicious modifications, and suggests focused tests before you commit.",
         ),
+        "run" => Some(
+            "NAME\n    please run - figure out how to run this project\n\nSYNOPSIS\n    please run\n    please run reset\n\nDESCRIPTION\n    Reads a small set of manifest and doc files (README, package.json, Cargo.toml, Dockerfile, and similar), asks the configured AI provider how to start the project, then asks for confirmation before running it. The decision is saved (outside the working tree, so it never shows up in git status), and every run after that replays it directly with no AI call. `please run reset` clears the saved decision so the next run re-detects it.",
+        ),
         "update" => Some(
             "NAME\n    please update - update please itself\n\nSYNOPSIS\n    please update\n    please update ignore\n\nDESCRIPTION\n    Updates `please` itself to the latest release in place, no reinstalling by hand.\n\n    If `please update ignore` is used, it hides the current update notification and prevents it from appearing again until an even newer version is released.",
         ),

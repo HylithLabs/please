@@ -3,7 +3,7 @@ mod gemini;
 mod openai;
 
 use crate::config::Config;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub struct GenerationOutcome {
     pub message: String,
@@ -411,6 +411,69 @@ pub fn plan_commits(
             anthropic::plan_commits(diff, context, &config.api_key, config.model.as_deref())
         }
         "openai" => openai::plan_commits(diff, context, &config.api_key, config.model.as_deref()),
+        other => Err(format!(
+            "Provider '{other}' is not supported yet. 'google' (Gemini), 'anthropic' (Claude), \
+             and 'openai' (ChatGPT) are wired up so far."
+        )),
+    }
+}
+
+/// What the model decided about running the current project. `precheck` and
+/// `precheck_hint` are empty strings rather than `Option` when there is
+/// nothing to check first: every provider's structured-output mode has its
+/// own dialect for "optional", and a flat, all-required, all-string schema
+/// sidesteps that entirely rather than translating it three different ways.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RunPlan {
+    pub precheck: String,
+    pub precheck_hint: String,
+    pub commands: Vec<String>,
+    pub summary: String,
+}
+
+pub struct RunPlanOutcome {
+    pub plan: RunPlan,
+    pub model_used: String,
+}
+
+fn run_plan_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "precheck": { "type": "string" },
+            "precheck_hint": { "type": "string" },
+            "commands": { "type": "array", "items": { "type": "string" } },
+            "summary": { "type": "string" }
+        },
+        "required": ["precheck", "precheck_hint", "commands", "summary"]
+    })
+}
+
+/// The model never reads the project itself — `please run` gathers a small,
+/// fixed allowlist of manifest/doc files (never anything like `.env`, it's
+/// simply not on the list) and hands their contents over once, here. No
+/// generic file-read tool exists for the agent to reach for a file that
+/// wasn't put in front of it.
+fn build_run_plan_prompt(manifest: &str) -> String {
+    format!(
+        "You are analyzing a software project to determine how to run it locally for \
+         development. Below are the project's manifest and documentation files. Decide the \
+         shell command(s) needed to start the project, in the order they should run. Assume \
+         dependencies are already installed; do not include install steps unless the project \
+         genuinely cannot start without them. If the project depends on something that might \
+         not already be running, such as a Docker daemon or a local database, put a single, \
+         cheap command in `precheck` whose exit code proves it is ready, and a short, actionable \
+         `precheck_hint` for what to do if that check fails; leave both as empty strings if \
+         there is nothing to check first. Output only the JSON described by the schema, with no \
+         explanation.\n\nProject files:\n{manifest}"
+    )
+}
+
+pub fn plan_run(manifest: &str, config: &Config) -> Result<RunPlanOutcome, String> {
+    match config.provider.as_str() {
+        "google" => gemini::plan_run(manifest, &config.api_key, config.model.as_deref()),
+        "anthropic" => anthropic::plan_run(manifest, &config.api_key, config.model.as_deref()),
+        "openai" => openai::plan_run(manifest, &config.api_key, config.model.as_deref()),
         other => Err(format!(
             "Provider '{other}' is not supported yet. 'google' (Gemini), 'anthropic' (Claude), \
              and 'openai' (ChatGPT) are wired up so far."

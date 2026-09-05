@@ -28,6 +28,7 @@ pub mod resolve;
 pub mod restore;
 pub mod revert;
 pub mod review;
+pub mod run;
 pub mod setup;
 pub mod split;
 pub mod squash;

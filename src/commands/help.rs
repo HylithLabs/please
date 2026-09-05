@@ -47,6 +47,10 @@ pub fn run() {
         "review",
         "AI-review the current changes and suggest focused tests",
     );
+    print_cmd(
+        "run [reset]",
+        "figure out how to run this project, then remember it",
+    );
     println!();
 
     println!("BRANCHING & SYNC");

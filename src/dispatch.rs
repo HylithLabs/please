@@ -26,6 +26,7 @@ const COMMANDS: &[(&str, CommandFn)] = &[
     ("status", |_| commands::status::run()),
     ("doctor", commands::doctor::run),
     ("review", |_| commands::review::run()),
+    ("run", commands::run::run),
     ("resolve", |_| commands::resolve::run()),
     ("recover", commands::recover::run),
     ("start", commands::start::run),
@@ -71,7 +72,7 @@ const FILLER_WORDS: &[&str] = &["to"];
 /// it's running inside a repo.
 const REPO_OPTIONAL: &[&str] = &[
     "init", "clone", "github", "help", "man", "setup", "config", "alias", "chat", "update",
-    "doctor",
+    "doctor", "run",
 ];
 
 /// Routes `please`'s own argv (everything after the binary name) to a

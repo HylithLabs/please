@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use super::{
-    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec,
+    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, RunPlan,
+    RunPlanOutcome, ToolCall, ToolSpec,
 };
 
 const CHAT_ENDPOINT: &str = "https://api.openai.com/v1/chat/completions";
@@ -170,6 +171,44 @@ pub fn plan_commits(
 #[derive(Deserialize)]
 struct RawCommitPlan {
     commits: Vec<CommitGroup>,
+}
+
+/// Lets the model decide how to run the current project from a bundle of its
+/// own manifest/doc files.
+pub fn plan_run(
+    manifest: &str,
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<RunPlanOutcome, String> {
+    let prompt = super::build_run_plan_prompt(manifest);
+    let format = ResponseFormat {
+        kind: "json_schema",
+        json_schema: JsonSchemaFormat {
+            name: "run_plan",
+            schema: super::require_closed_objects(&super::run_plan_schema()),
+            strict: true,
+        },
+    };
+
+    let outcome = generate_with_retry(
+        "Figuring out how to run this project",
+        &prompt,
+        api_key,
+        model,
+        Some(format),
+    )?;
+
+    let plan: RunPlan = serde_json::from_str(&outcome.message)
+        .map_err(|e| format!("failed to parse run plan JSON: {e}"))?;
+
+    if plan.commands.is_empty() {
+        return Err("model returned an empty run plan".to_string());
+    }
+
+    Ok(RunPlanOutcome {
+        plan,
+        model_used: outcome.model_used,
+    })
 }
 
 /// Calls ChatGPT with the given prompt. If the configured model fails (e.g.

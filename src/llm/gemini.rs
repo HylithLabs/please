@@ -69,7 +69,8 @@ struct ModelInfo {
 }
 
 use super::{
-    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, ToolCall, ToolSpec,
+    AgentMessage, AgentTurn, CommitGroup, CommitPlanOutcome, GenerationOutcome, RunPlan,
+    RunPlanOutcome, ToolCall, ToolSpec,
 };
 
 pub fn describe_codebase(
@@ -130,6 +131,40 @@ pub fn plan_commits(
 #[derive(Deserialize)]
 struct RawCommitPlan {
     commits: Vec<CommitGroup>,
+}
+
+/// Lets the model decide how to run the current project from a bundle of its
+/// own manifest/doc files.
+pub fn plan_run(
+    manifest: &str,
+    api_key: &str,
+    model: Option<&str>,
+) -> Result<RunPlanOutcome, String> {
+    let prompt = super::build_run_plan_prompt(manifest);
+    let generation_config = GenerationConfig {
+        response_mime_type: "application/json".to_string(),
+        response_schema: to_gemini_schema(&super::run_plan_schema()),
+    };
+
+    let outcome = generate_with_retry(
+        "Figuring out how to run this project",
+        &prompt,
+        api_key,
+        model,
+        Some(generation_config),
+    )?;
+
+    let plan: RunPlan = serde_json::from_str(&outcome.message)
+        .map_err(|e| format!("failed to parse run plan JSON: {e}"))?;
+
+    if plan.commands.is_empty() {
+        return Err("model returned an empty run plan".to_string());
+    }
+
+    Ok(RunPlanOutcome {
+        plan,
+        model_used: outcome.model_used,
+    })
 }
 
 /// Calls Gemini with the given prompt. If the configured model fails (e.g. it
