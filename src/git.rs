@@ -29,13 +29,32 @@ pub fn diff_staged() -> String {
 }
 
 /// The complete tracked working-tree diff, including staged and unstaged
-/// changes. `HEAD` makes the command useful regardless of staging state.
+/// changes. `HEAD` makes the command useful regardless of staging state,
+/// except on a repo with no commits yet, where `HEAD` doesn't resolve to
+/// anything and `diff HEAD` fails outright (unlike `diff --cached`, which
+/// git special-cases against the empty tree). Splitting into `--cached`
+/// (staged vs. nothing yet) plus a plain `diff` (worktree vs. index) covers
+/// the same ground on an unborn branch.
 pub fn diff_head() -> String {
-    let mut diff = Command::new("git")
-        .args(["diff", "HEAD", "--"])
-        .output()
-        .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
-        .unwrap_or_default();
+    let mut diff = if has_commits() {
+        Command::new("git")
+            .args(["diff", "HEAD", "--"])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default()
+    } else {
+        let staged = Command::new("git")
+            .args(["diff", "--cached", "--"])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default();
+        let unstaged = Command::new("git")
+            .args(["diff", "--"])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default();
+        staged + &unstaged
+    };
 
     // `git diff` does not include untracked files. Include readable ones so
     // review sees the same work the developer sees, without staging anything.
