@@ -60,7 +60,9 @@ pub fn run(args: &[String]) {
     let outcome = match llm::plan_run(&manifest, &cfg) {
         Ok(outcome) => outcome,
         Err(err) => {
-            ui::error(&format!("couldn't figure out how to run this project: {err}"));
+            ui::error(&format!(
+                "couldn't figure out how to run this project: {err}"
+            ));
             std::process::exit(1);
         }
     };
@@ -93,7 +95,9 @@ pub fn run(args: &[String]) {
 
 fn reset() {
     match std::fs::remove_file(cache_path()) {
-        Ok(()) => println!("Cleared the saved run command. `please run` will figure it out fresh next time."),
+        Ok(()) => println!(
+            "Cleared the saved run command. `please run` will figure it out fresh next time."
+        ),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
             println!("Nothing saved yet.");
         }
@@ -144,8 +148,8 @@ fn save_cached_plan(plan: &RunPlan) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let json = serde_json::to_string_pretty(plan)
-        .map_err(|err| std::io::Error::other(err.to_string()))?;
+    let json =
+        serde_json::to_string_pretty(plan).map_err(|err| std::io::Error::other(err.to_string()))?;
     std::fs::write(path, json)
 }
 
