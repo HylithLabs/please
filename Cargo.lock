@@ -1128,7 +1128,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "please"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "axoupdater",
  "owo-colors",

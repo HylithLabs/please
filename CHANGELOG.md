@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 2.1.0
+
+* Removed the `Next:` step hint that printed after almost every command. In its place `please` now shows an occasional colorful `Tip:` one-liner, roughly one run in five, pointing at a feature you might not have reached for yet
+* Added `please run set "<command>"` and `please run reset`. These record how to start a project by hand with no AI call, so you (or `please chat`) can tell `please run` the real steps once and have every later run replay them
+* `please run set` also takes `--check "<probe>"` to guard the run behind a health check (for example `docker info`) and `--term` to mark it as a long-running process
+* `please run` now launches long-running processes such as dev servers and file watchers in a new terminal window, leaving your current shell free. Pass `--here` to force it inline or `--new-terminal` to force a window
+* `please chat` can now set up `please run` for you: explain how the project starts and the agent saves it with `please run set`
+* Reworked the update checker so it behaves like the rest of `please`: no background timer, no scheduled job, nothing running while `please` is idle. It checks only when you run a command, shows the result from cache instantly, then refreshes in a fully detached background process for the next run. It stays quiet under `NO_UPDATE_NOTIFIER`, `CI`, and piped output, and `please update ignore` now sticks across refreshes
+
 ## Version 2.0.0
 
 * Added `please github [url]` — initializes Git, switches to `main`, creates the first commit, sets `origin`, and pushes in one step

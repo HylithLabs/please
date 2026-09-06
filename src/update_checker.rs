@@ -2,19 +2,16 @@ use std::fs;
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-/// How long a fetched result stays fresh before a new background refresh is
-/// kicked off. The notice itself is shown from cache on every run in
-/// between, so this only controls how often `please` talks to GitHub, not
-/// how often the developer sees the reminder.
-const REFRESH_AFTER_SECS: u64 = 6 * 60 * 60;
-
+/// The update check runs like the rest of `please`: only when the developer
+/// runs a command, never on a timer. Each run shows whatever the last
+/// background check already found (instant, from cache) and then kicks off a
+/// fresh detached check for next time. There is no scheduled job and no
+/// interval, so nothing happens while `please` is idle.
 #[derive(Serialize, Deserialize, Default)]
 struct UpdateCache {
-    last_checked_timestamp: u64,
     latest_version: Option<String>,
     ignored_version: Option<String>,
 }
@@ -37,13 +34,6 @@ fn write_cache(cache: &UpdateCache) {
     }
 }
 
-fn now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
 /// Opt out the way every other CLI's update notifier lets you: an env var,
 /// plus staying quiet when output isn't a real terminal (CI, pipes, cron).
 fn checks_disabled() -> bool {
@@ -54,9 +44,10 @@ fn checks_disabled() -> bool {
 
 /// Runs on every command except `please update` itself. Two independent
 /// jobs: show the reminder from whatever the last background check already
-/// found (instant, no network), and, if that result has gone stale, kick
-/// off a fully detached background process to refresh it for next time.
-/// The current command never waits on the network.
+/// found (instant, no network), and kick off a fully detached background
+/// process to refresh that result for next time. The current command never
+/// waits on the network, and nothing runs unless the developer ran a
+/// command to trigger it.
 pub fn check_and_notify() {
     if checks_disabled() {
         return;
@@ -76,11 +67,7 @@ pub fn check_and_notify() {
         );
     }
 
-    let stale = cache.latest_version.is_none()
-        || now_secs().saturating_sub(cache.last_checked_timestamp) > REFRESH_AFTER_SECS;
-    if stale {
-        spawn_background_refresh();
-    }
+    spawn_background_refresh();
 }
 
 /// Spawns `please --internal-update-check` as a detached child: no shared
@@ -173,7 +160,6 @@ pub fn run_internal_check() {
     };
 
     let mut cache = read_cache();
-    cache.last_checked_timestamp = now_secs();
     cache.latest_version = Some(tag.trim_start_matches('v').to_string());
     write_cache(&cache);
 }
