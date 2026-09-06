@@ -55,9 +55,34 @@ pub fn success(message: &str) {
     println!("{} {}", green_bold("done"), message);
 }
 
-/// A concise suggested next action, shown after a command completes.
+/// An occasional catchy pointer at a feature the developer might not have
+/// tried. Shown at random, not on every run. Printed to stderr so it never
+/// lands in piped output, with backticked commands painted so they pop.
 pub fn tip(message: &str) {
-    println!("{} {}", green_bold("Next:"), message);
+    eprintln!("\n{} {}", magenta_bold("Tip:"), highlight_code(message));
+}
+
+fn magenta_bold(text: &str) -> String {
+    paint(text, "1;35")
+}
+
+/// Paints the text between `backticks` cyan so commands stand out in a
+/// sentence, leaving everything else untouched. With colors off, the
+/// backticks are left in place so the emphasis still reads.
+fn highlight_code(text: &str) -> String {
+    if !colors_enabled() {
+        return text.to_string();
+    }
+    text.split('`')
+        .enumerate()
+        .map(|(i, part)| {
+            if i % 2 == 1 {
+                paint(part, "1;36")
+            } else {
+                part.to_string()
+            }
+        })
+        .collect()
 }
 
 /// A file (or other) line under a success/step message, indented and muted

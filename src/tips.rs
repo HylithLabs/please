@@ -1,51 +1,52 @@
-use crate::{git, ui};
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hasher};
 
-/// Prints one useful follow-up action after a command completes. Suggestions
-/// are intentionally deterministic: they are based on the repository state,
-/// not another AI request, so they are instant and free.
+use crate::ui;
+
+/// Catchy one-liners in the spirit of "did you know", pointing at a feature
+/// the developer might not have reached for yet. Kept short, one command per
+/// tip, phrased to make trying it sound worth it.
+const TIPS: &[&str] = &[
+    "`please review` gives you an AI read on your changes, and the bugs in them, before you commit.",
+    "`please run` figures out how to start any project and remembers it. Tell `please chat` how it really runs to override.",
+    "Skip the command names entirely: `please \"undo my last two commits but keep the changes\"`.",
+    "`please doctor` checks your Git, your repo, and your AI setup in one pass.",
+    "`please squash` folds a messy branch into one clean, AI-written commit.",
+    "`please chat` keeps the agent alive across turns for multi-step work.",
+    "`please undo` takes back your last commit but leaves the work in your tree.",
+    "`please alias plz` (or any name) gives you less to type every day.",
+    "`please stash` puts everything aside, tracked and untracked, and hands you a clean tree.",
+    "`please start \"add dark mode\"` opens a tidy `feature/add-dark-mode` branch.",
+    "`please purge <path>` scrubs a file out of your whole history, not just the latest commit.",
+    "`please recover` brings back a commit you thought you lost.",
+    "Write your team's conventions once in `.please/instructions.md` and every AI command follows them.",
+    "`please resolve` walks you through a merge conflict and explains both sides.",
+    "`please context --refresh` regenerates what the AI knows about your project.",
+];
+
+/// Roughly one run in this many prints a tip. Small enough to notice, rare
+/// enough not to nag.
+const ODDS: u64 = 5;
+
+/// Commands with their own flow or output where a trailing tip would just be
+/// noise.
+const SKIP: &[&str] = &["chat", "help", "man", "update", "setup", "config"];
+
 pub fn show(args: &[String]) {
-    let command = args.first().map(String::as_str);
-
-    // No arguments already displays the full help screen.
-    if args.is_empty() {
+    let Some(command) = args.first().map(String::as_str) else {
+        return;
+    };
+    if SKIP.contains(&command) {
         return;
     }
 
-    // `please chat` is an interactive experience and already has its own
-    // conversational flow. Do not append a tip after the user exits it.
-    if command == Some("chat") || command == Some("help") || command == Some("man") {
+    // `RandomState::new()` is seeded from system entropy per call, so an empty
+    // hasher's `finish()` is a fresh random number without pulling in an RNG
+    // crate just for a dice roll.
+    let roll = RandomState::new().build_hasher().finish();
+    if !roll.is_multiple_of(ODDS) {
         return;
     }
 
-    if !git::is_repo() {
-        // A natural-language request can work without Git, but a Git-specific
-        // follow-up cannot. Keep the hint useful without interrupting setup,
-        // configuration, or other repository-independent commands.
-        if command.is_none() || !matches!(command, Some("setup" | "config" | "alias" | "update")) {
-            ui::tip("run `please init` here when you’re ready to use Git features.");
-        }
-        return;
-    }
-
-    let pending = git::has_pending_changes();
-    let upstream = git::upstream_branch();
-    let ahead = upstream
-        .as_deref()
-        .and_then(git::ahead_behind)
-        .map(|(ahead, _)| ahead)
-        .unwrap_or(0);
-
-    match command {
-        Some("init") => ui::tip("run `please status` to see your new repository."),
-        Some("status") if pending => ui::tip("run `please commit` to save these changes."),
-        Some("commit") if upstream.is_some() => ui::tip("run `please push` to share your commit."),
-        Some("push") => ui::tip("run `please status` to confirm everything is up to date."),
-        Some("branch") | Some("switch") | Some("sync") => {
-            ui::tip("run `please status` to inspect the current branch.")
-        }
-        Some("status") if ahead > 0 => ui::tip("run `please push` to share your local commits."),
-        Some("status") => ui::tip("your working tree is clean — try `please chat` for help."),
-        _ if pending => ui::tip("run `please status` or `please commit` for the next step."),
-        _ => {}
-    }
+    ui::tip(TIPS[(roll / ODDS) as usize % TIPS.len()]);
 }
