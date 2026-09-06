@@ -24,13 +24,15 @@ fn main() {
     }
     args.retain(|a| a != "--feedback" && a != "-f");
 
-    let is_update = args.get(1).map(|s| s.as_str()) == Some("update");
+    // Before the command runs, not after: many subcommands call
+    // `std::process::exit` on their own and would never come back here. The
+    // notice is read from cache and printed to stderr, so it costs nothing
+    // and never pollutes piped output.
+    if args.get(1).map(|s| s.as_str()) != Some("update") {
+        update_checker::check_and_notify();
+    }
 
     dispatch::route(&args[1..]);
 
     tips::show(&args[1..]);
-
-    if !is_update {
-        update_checker::check_and_notify();
-    }
 }
