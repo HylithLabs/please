@@ -141,7 +141,7 @@ fn tool_specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "run_please",
-            description: "Run a `please` subcommand. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, list/pop/drop for stash, a path for purge, or a count/ref for squash).",
+            description: "Run a `please` subcommand. `command` is the subcommand name; `args` are any extra arguments it takes (e.g. a branch name, list/pop/drop for stash, a path for purge, or a count/ref for squash). For `run`, only the `set` and `reset` forms are available here: `run set \"<command>\"` (add `--term` before the command for a dev server, or `--check \"<probe>\"` before it for a dependency to verify first) records how this project runs, and `run reset` clears it. Use this when the developer tells you how their project starts.",
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -152,7 +152,7 @@ fn tool_specs() -> Vec<ToolSpec> {
                             "move-commit", "discard", "restore", "rename", "cleanup", "log",
                             "revert", "stash", "purge", "squash", "commit", "push", "update",
                             "doctor", "review", "resolve", "recover", "start", "split", "reorder", "combine",
-                            "release", "context"
+                            "release", "context", "run"
                         ]
                     },
                     "args": { "type": "array", "items": { "type": "string" } }
@@ -408,6 +408,13 @@ fn please_risk(command: &str, args: &[String]) -> Risk {
             _ => Risk::Mutating, // push (default) or pop
         },
         "sync" if args.first().map(String::as_str) == Some("exactly") => Risk::InteractiveOnly,
+        // Bare `please run` asks "Run this?" at the keyboard and, through the
+        // agent with stdin closed, would just cancel itself. Only the
+        // non-interactive `set`/`reset` forms make sense here.
+        "run" => match args.first().map(String::as_str) {
+            Some("set") | Some("reset") => Risk::Mutating,
+            _ => Risk::InteractiveOnly,
+        },
         // A `switch` to a branch that already exists just switches; to one
         // that doesn't, switch.rs asks "create it?" and reads stdin itself —
         // checked here dynamically against real repo state, not guessed.

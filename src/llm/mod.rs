@@ -429,6 +429,11 @@ pub struct RunPlan {
     pub precheck_hint: String,
     pub commands: Vec<String>,
     pub summary: String,
+    /// True when the last command keeps running and holds the terminal (a
+    /// dev server, a watcher). `please run` offers to launch those in a new
+    /// terminal window so the developer's shell stays free.
+    #[serde(default)]
+    pub long_running: bool,
 }
 
 pub struct RunPlanOutcome {
@@ -443,9 +448,10 @@ fn run_plan_schema() -> serde_json::Value {
             "precheck": { "type": "string" },
             "precheck_hint": { "type": "string" },
             "commands": { "type": "array", "items": { "type": "string" } },
-            "summary": { "type": "string" }
+            "summary": { "type": "string" },
+            "long_running": { "type": "boolean" }
         },
-        "required": ["precheck", "precheck_hint", "commands", "summary"]
+        "required": ["precheck", "precheck_hint", "commands", "summary", "long_running"]
     })
 }
 
@@ -464,8 +470,10 @@ fn build_run_plan_prompt(manifest: &str) -> String {
          not already be running, such as a Docker daemon or a local database, put a single, \
          cheap command in `precheck` whose exit code proves it is ready, and a short, actionable \
          `precheck_hint` for what to do if that check fails; leave both as empty strings if \
-         there is nothing to check first. Output only the JSON described by the schema, with no \
-         explanation.\n\nProject files:\n{manifest}"
+         there is nothing to check first. Set `long_running` to true when the final command \
+         stays in the foreground and holds the terminal, such as a dev server or a file \
+         watcher, and false for a task that runs and exits. Output only the JSON described by \
+         the schema, with no explanation.\n\nProject files:\n{manifest}"
     )
 }
 

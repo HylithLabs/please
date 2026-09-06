@@ -48,7 +48,7 @@ pub fn run() {
         "AI-review the current changes and suggest focused tests",
     );
     print_cmd(
-        "run [reset]",
+        "run [set|reset]",
         "figure out how to run this project, then remember it",
     );
     println!();
